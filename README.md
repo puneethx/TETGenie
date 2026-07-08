@@ -141,15 +141,6 @@ Firebase gives us login, the database (Firestore) and file storage — all free 
 4. You'll see a `firebaseConfig = { apiKey: "...", ... }` block. Copy each value into
    `frontend/.env`:
 
-   | firebaseConfig key   | .env variable                       |
-   |----------------------|-------------------------------------|
-   | `apiKey`             | `VITE_FIREBASE_API_KEY`             |
-   | `authDomain`         | `VITE_FIREBASE_AUTH_DOMAIN`         |
-   | `projectId`          | `VITE_FIREBASE_PROJECT_ID`          |
-   | `storageBucket`      | `VITE_FIREBASE_STORAGE_BUCKET`      |
-   | `messagingSenderId`  | `VITE_FIREBASE_MESSAGING_SENDER_ID` |
-   | `appId`              | `VITE_FIREBASE_APP_ID`              |
-
 5. Restart `npm run dev` (Vite reads `.env` at startup). Sign up — you should land in the app. 🎉
 
 > **Are these keys secret?** No — Firebase web keys are *meant* to be in the browser.
@@ -193,17 +184,7 @@ Then set `VITE_AI_BACKEND_URL=http://localhost:8000` in `frontend/.env` and rest
 
 For **local dev only**, you can set `DISABLE_AUTH=1` to skip token checks. Never do this in production.
 
-### Backend environment variables
-| Variable | What it is |
-|---|---|
-| `AICORE_TOKEN_URL` | UAA OAuth URL, ending in `/oauth/token` (from your AI Core service key `uaa.url`) |
-| `AICORE_CLIENT_ID` / `AICORE_CLIENT_SECRET` | service-key credentials (the secret's `$` is fine here) |
-| `AICORE_BASE_URL` | `serviceurls.AI_API_URL` |
-| `AICORE_DEPLOYMENT_ID` | your orchestration deployment id |
-| `AICORE_MODEL_NAME` | `anthropic--claude-4.6-opus` |
-| `FIREBASE_PROJECT_ID` | your Firebase project id (used to verify caller tokens) |
-| `ADMIN_EMAILS` | comma-separated admin emails allowed to run extraction (recommended) |
-| `CORS_ORIGINS` | your frontend URL(s), comma-separated (`*` for local dev) |
+### Backend
 
 > 🔒 **Auth without a service account:** the backend verifies the caller's Firebase ID token
 > against Google's public keys and (if `ADMIN_EMAILS` is set) checks the verified email — so
