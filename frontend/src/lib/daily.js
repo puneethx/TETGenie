@@ -1,0 +1,74 @@
+// Firestore data layer for daily AI-generated papers (Premium).
+//
+//   dailyPapers/{id}                 ← metadata (title/date/stats) — any signed-in user
+//   dailyPapers/{id}/secure/otp      ← { otp } — Premium only
+//   dailyPapers/{id}/data/questions  ← { items:[...] } — Premium only
+import {
+  collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc,
+  query, orderBy, serverTimestamp, arrayUnion,
+} from 'firebase/firestore'
+import { db, auth } from './firebase'
+
+export function newDailyId(date) {
+  return `daily-${date}-${Date.now().toString(36)}`
+}
+
+// 6-digit OTP that changes per paper.
+export function makeOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+export async function listDailyPapers() {
+  const q = query(collection(db, 'dailyPapers'), orderBy('date', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+}
+
+export async function getDailyPaper(id) {
+  const s = await getDoc(doc(db, 'dailyPapers', id))
+  return s.exists() ? { id: s.id, ...s.data() } : null
+}
+
+export async function getDailyQuestions(id) {
+  const s = await getDoc(doc(db, 'dailyPapers', id, 'data', 'questions'))
+  return s.exists() ? s.data().items || [] : []
+}
+
+// Premium members (and admins) can read the OTP doc.
+export async function getDailyOtp(id) {
+  const s = await getDoc(doc(db, 'dailyPapers', id, 'secure', 'otp'))
+  return s.exists() ? s.data().otp : null
+}
+
+export async function publishDailyPaper({ date, title, questions, stats, otp }) {
+  const id = newDailyId(date)
+  await setDoc(doc(db, 'dailyPapers', id), {
+    title: title || `Daily Paper — ${date}`,
+    date,
+    type: 'daily',
+    totalQuestions: questions.length,
+    stats: stats || {},
+    published: true,
+    createdAt: serverTimestamp(),
+    createdBy: auth?.currentUser?.uid || null,
+  })
+  await setDoc(doc(db, 'dailyPapers', id, 'data', 'questions'), { items: questions })
+  await setDoc(doc(db, 'dailyPapers', id, 'secure', 'otp'), { otp })
+  return id
+}
+
+// Verify the OTP the user typed and, if correct, record the unlock on their
+// own profile. (OTP read requires Premium — enforced by rules.)
+export async function unlockDaily(id, entered) {
+  const otp = await getDailyOtp(id)
+  if (!otp || String(entered).trim() !== String(otp)) return false
+  const uid = auth?.currentUser?.uid
+  if (uid) await updateDoc(doc(db, 'users', uid), { unlockedExams: arrayUnion(id) })
+  return true
+}
+
+export async function deleteDailyPaper(id) {
+  await deleteDoc(doc(db, 'dailyPapers', id, 'data', 'questions'))
+  await deleteDoc(doc(db, 'dailyPapers', id, 'secure', 'otp'))
+  await deleteDoc(doc(db, 'dailyPapers', id))
+}

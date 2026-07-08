@@ -1,0 +1,67 @@
+.auth {
+  min-height: 100dvh;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + var(--sp-3)) var(--sp-4)
+    calc(env(safe-area-inset-bottom) + var(--sp-6));
+  display: flex;
+  flex-direction: column;
+}
+.auth-back {
+  align-self: flex-start;
+  margin-bottom: var(--sp-4);
+}
+.auth-head {
+  text-align: center;
+  margin-bottom: var(--sp-5);
+}
+.auth-head .logo-wrap { display: flex; justify-content: center; margin-bottom: var(--sp-4); }
+.auth-head h2 { font-size: var(--fs-2xl); font-weight: 800; letter-spacing: -0.02em; }
+.auth-head p { color: var(--text-muted); margin-top: var(--sp-1); }
+
+.auth-form { display: flex; flex-direction: column; }
+.name-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+
+.auth-alert {
+  background: color-mix(in srgb, var(--red-500) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--red-500) 40%, transparent);
+  color: var(--red-600);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-4);
+}
+
+.auth-switch {
+  text-align: center;
+  margin-top: var(--sp-5);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.auth-switch a { font-weight: 700; }
+
+/* Password strength meter */
+.strength { margin-top: var(--sp-1); }
+.strength-bars { display: flex; gap: 5px; }
+.strength-bars span {
+  height: 5px;
+  flex: 1;
+  border-radius: 3px;
+  background: var(--border-strong);
+  transition: background var(--dur) var(--ease);
+}
+.strength[data-score='1'] .strength-bars span:nth-child(-n + 1),
+.strength[data-score='2'] .strength-bars span:nth-child(-n + 2),
+.strength[data-score='3'] .strength-bars span:nth-child(-n + 3),
+.strength[data-score='4'] .strength-bars span:nth-child(-n + 4) {
+  background: var(--meter-color, var(--brand-500));
+}
+.strength-label { font-size: var(--fs-xs); font-weight: 600; margin-top: 4px; }
+
+.req-list { display: grid; gap: 3px; margin-top: var(--sp-2); }
+.req-item { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-faint); }
+.req-item.met { color: var(--green-500); }
+.req-item .rc {
+  width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  border: 1.5px solid currentColor;
+}

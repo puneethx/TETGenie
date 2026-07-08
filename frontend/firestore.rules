@@ -1,0 +1,98 @@
+rules_version = '2';
+
+// TETGenie Firestore security rules.
+// Deploy from Firebase Console → Firestore Database → Rules (paste + Publish),
+// or via the Firebase CLI (`firebase deploy --only firestore:rules`).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // A user is an admin if THEIR OWN users/{uid} doc has role == 'admin'.
+    // You set this manually in the Firebase Console (see README).
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Premium = paid subscriber (admins count as premium).
+    function isPremium() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription == 'premium'
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    match /users/{uid} {
+      // A user can read their own profile; admins can read anyone's.
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+
+      // On signup a user may create ONLY their own doc, and ONLY as a free,
+      // non-admin user. This stops anyone from self-granting admin/premium.
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.subscription == 'free';
+
+      // A user may edit their own profile, but can NEVER change their own
+      // role or subscription (only an admin can flip those).
+      allow update: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.subscription == resource.data.subscription;
+
+      // Admins have full control (e.g. marking a paid user as Premium).
+      allow read, write: if isAdmin();
+
+      // A user's own exam attempts / best scores.
+      match /attempts/{paperId} {
+        allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+        allow write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ── Content collections are added in later phases ──
+    // Previous-year papers & their questions: readable by any signed-in user
+    // (free content), writable only by admins.
+    match /papers/{paperId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+      match /{document=**} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
+    }
+
+    // ── Daily AI-generated papers (Premium) ──
+    // The top-level doc holds only non-secret metadata (title, date, stats) so
+    // the calendar can show locked entries. The OTP and the questions live in
+    // sub-docs readable only by Premium members.
+    match /dailyPapers/{paperId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      match /secure/{doc} {          // { otp: "123456" }
+        allow read: if isPremium();
+        allow write: if isAdmin();
+      }
+      match /data/{doc} {            // { items: [ ...questions ] }
+        allow read: if isPremium();
+        allow write: if isAdmin();
+      }
+    }
+
+    // ── Leaderboard (opt-in) — one score doc per user per paper ──
+    match /leaderboard/{paperId}/scores/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Everything else is locked down until its phase ships.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

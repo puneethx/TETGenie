@@ -1,0 +1,56 @@
+.dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  background: var(--surface-2);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.dropzone.has-file { border-color: var(--primary); background: var(--primary-soft); }
+.dropzone .dz-icon {
+  width: 60px; height: 60px; margin: 0 auto var(--sp-3);
+  border-radius: var(--r-lg); display: grid; place-items: center;
+  background: var(--grad-brand); color: #fff;
+}
+
+/* Extraction progress */
+.extracting { text-align: center; padding: var(--sp-5) 0; }
+.extract-orb {
+  width: 96px; height: 96px; margin: 0 auto var(--sp-4);
+  border-radius: 50%;
+  background: var(--grad-brand);
+  display: grid; place-items: center; color: #fff;
+  box-shadow: var(--shadow-lg);
+  animation: pulse 1.8s var(--ease) infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-500) 45%, transparent); }
+  50% { transform: scale(1.04); box-shadow: 0 0 0 18px transparent; }
+}
+.progress-track {
+  height: 10px; border-radius: var(--r-full);
+  background: var(--surface-2); border: 1px solid var(--border);
+  overflow: hidden; margin: var(--sp-4) 0 var(--sp-2);
+}
+.progress-fill {
+  height: 100%; border-radius: var(--r-full);
+  background: var(--grad-brand);
+  transition: width 400ms var(--ease);
+}
+.progress-steps { display: flex; justify-content: center; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
+.pstep { font-size: var(--fs-xs); color: var(--text-faint); display: inline-flex; align-items: center; gap: 5px; }
+.pstep.on { color: var(--primary); font-weight: 700; }
+.pstep.done { color: var(--green-500); }
+
+.review-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3); }
+.stat-tile .n { font-size: var(--fs-2xl); font-weight: 800; }
+.stat-tile .l { font-size: var(--fs-xs); color: var(--text-muted); }
+
+.publish-bar {
+  position: sticky; bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  padding: var(--sp-3) 0; margin-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}

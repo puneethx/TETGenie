@@ -1,0 +1,121 @@
+/* ============================================================
+   TETGenie design tokens — mobile-first, theme-aware.
+   Themes are switched by [data-theme="light"|"dark"] on <html>.
+   ============================================================ */
+
+:root {
+  /* Brand — the "Genie" violet + a premium amber accent */
+  --brand-50: #f5f3ff;
+  --brand-100: #ede9fe;
+  --brand-200: #ddd6fe;
+  --brand-400: #a78bfa;
+  --brand-500: #8b5cf6;
+  --brand-600: #7c3aed;
+  --brand-700: #6d28d9;
+  --brand-800: #5b21b6;
+
+  --gold-400: #fbbf24;
+  --gold-500: #f59e0b;
+  --gold-600: #d97706;
+
+  --green-500: #16a34a; /* correct answer (matches the paper's green marker) */
+  --green-600: #15803d;
+  --red-500: #dc2626;   /* wrong answer */
+  --red-600: #b91c1c;
+
+  /* Brand gradient used on hero, CTAs, logo */
+  --grad-brand: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  --grad-gold: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+
+  /* Type scale (rem) */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+
+  /* Spacing */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-8: 3rem;
+
+  /* Radii */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --r-full: 999px;
+
+  /* Layout */
+  --app-max-width: 480px;   /* phone-first content column */
+  --bottom-nav-h: 64px;
+  --top-bar-h: 56px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur: 180ms;
+
+  /* Fonts — bundle a Telugu-capable stack so Telugu renders everywhere */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Noto Sans Telugu', 'Gautami', 'Nirmala UI', sans-serif;
+  --font-telugu: 'Noto Sans Telugu', 'Gautami', 'Nirmala UI', system-ui, sans-serif;
+}
+
+/* ---------- LIGHT THEME ---------- */
+:root,
+:root[data-theme='light'] {
+  --bg: #f4f4fb;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f7fc;
+  --surface-hover: #f0eefb;
+  --border: #e6e6ef;
+  --border-strong: #d4d4e2;
+
+  --text: #1b1b2f;
+  --text-muted: #64647a;
+  --text-faint: #9a9ab0;
+  --on-brand: #ffffff;
+
+  --primary: var(--brand-700);
+  --primary-hover: var(--brand-800);
+  --primary-soft: var(--brand-50);
+  --primary-soft-border: var(--brand-200);
+
+  --shadow-sm: 0 1px 2px rgba(27, 27, 47, 0.06), 0 1px 3px rgba(27, 27, 47, 0.08);
+  --shadow-md: 0 4px 12px rgba(27, 27, 47, 0.08), 0 2px 4px rgba(27, 27, 47, 0.06);
+  --shadow-lg: 0 12px 32px rgba(91, 33, 182, 0.14);
+  --scrim: rgba(20, 20, 35, 0.45);
+}
+
+/* ---------- DARK THEME ---------- */
+:root[data-theme='dark'] {
+  --bg: #0e0e18;
+  --bg-elevated: #16162a;
+  --surface: #181830;
+  --surface-2: #1f1f3a;
+  --surface-hover: #26264a;
+  --border: #2a2a44;
+  --border-strong: #3a3a5a;
+
+  --text: #f1f1f7;
+  --text-muted: #a5a5c0;
+  --text-faint: #70708c;
+  --on-brand: #ffffff;
+
+  --primary: var(--brand-500);
+  --primary-hover: var(--brand-400);
+  --primary-soft: rgba(139, 92, 246, 0.14);
+  --primary-soft-border: rgba(139, 92, 246, 0.35);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --scrim: rgba(0, 0, 0, 0.62);
+}
