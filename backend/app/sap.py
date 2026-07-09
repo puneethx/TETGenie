@@ -92,16 +92,19 @@ class SapAiCore:
     def vision(self, system: str, text: str, image_b64_png: str,
                max_tokens: int = 2200, temperature: float = 0.0) -> str:
         """Completion with one PNG image (base64, no data-URI prefix) + text."""
+        return self.vision_multi(system, [(text, image_b64_png)], max_tokens, temperature)
+
+    def vision_multi(self, system: str, pages: list[tuple[str, str]],
+                     max_tokens: int = 2200, temperature: float = 0.0) -> str:
+        """Completion with multiple PNG pages. pages = [(text_label, image_b64_png), ...]"""
+        content: list[dict] = []
+        for text, img in pages:
+            content.append({"type": "text", "text": text})
+            content.append({"type": "image_url",
+                            "image_url": {"url": "data:image/png;base64," + img}})
         messages = [
             {"role": "system", "content": system},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": text},
-                    {"type": "image_url",
-                     "image_url": {"url": "data:image/png;base64," + image_b64_png}},
-                ],
-            },
+            {"role": "user", "content": content},
         ]
         return self._completion(messages, max_tokens, temperature)
 
