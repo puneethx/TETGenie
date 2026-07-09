@@ -1,17 +1,30 @@
 import { useEffect, useState } from 'react'
 import { listUsers, setSubscription } from '../../lib/users'
 import PageHeader from '../../components/PageHeader'
-import Icon from '../../components/Icon'
 
 export default function Users() {
   const [users, setUsers] = useState(null)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [savingId, setSavingId] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
+    // Uses the cached list if available (instant); refetches only if empty.
     listUsers().then(setUsers).catch((e) => setError(e.message || 'Failed to load users.'))
   }, [])
+
+  async function refresh() {
+    setRefreshing(true)
+    setError('')
+    try {
+      setUsers(await listUsers({ force: true }))
+    } catch (e) {
+      setError(e.message || 'Failed to load users.')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   async function toggle(u) {
     const next = u.subscription === 'premium' ? 'free' : 'premium'
@@ -42,6 +55,11 @@ export default function Users() {
       <PageHeader
         title="Users"
         subtitle={users ? `${users.length} total · ${premiumCount} premium` : 'Loading…'}
+        action={(
+          <button className="btn btn-ghost" style={{ minHeight: 38, padding: '0 14px', flex: 'none' }} onClick={refresh} disabled={refreshing}>
+            {refreshing ? <span className="spinner" style={{ borderTopColor: 'var(--primary)', borderColor: 'var(--border-strong)' }} /> : 'Refresh'}
+          </button>
+        )}
       />
 
       {error && <div className="auth-alert">{error}</div>}
