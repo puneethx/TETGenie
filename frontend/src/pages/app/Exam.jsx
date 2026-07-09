@@ -126,7 +126,7 @@ export default function Exam({ kind = 'py' }) {
       // Use the pre-rendered image if ready; otherwise render on demand.
       let file = shareFileRef.current
       if (!file) file = await renderNodeToFile(cardRef.current, 'tetgenie-score.png')
-      const outcome = await shareFile(file, 'My TETGenie score 🧞 — practice AP TET daily mock papers! tetgenie')
+      const outcome = await shareFile(file, 'My TETGenie score 🧞 — practice AP TET daily mock papers! tetgenie https://tet-genie.vercel.app')
       if (outcome === 'downloaded') setShareMsg('Image saved — open WhatsApp and attach it. 📎')
       else if (outcome === 'failed') setShareMsg('Sharing unavailable — please screenshot this card.')
     } finally {
