@@ -46,17 +46,32 @@ def _parse_json(raw: str) -> dict:
     return json.loads(raw)
 
 
+def _coerce_qnum(n) -> int | None:
+    """Question numbers sometimes come back as strings ("1") — normalise to int."""
+    if isinstance(n, bool):
+        return None
+    if isinstance(n, int):
+        return n
+    if isinstance(n, str) and n.strip().isdigit():
+        return int(n.strip())
+    return None
+
+
 def _extract_page_group(doc, page_indices: list[int], qnums: list[int]) -> list[dict]:
     """Extract questions from one or more consecutive pages that belong together."""
     if not qnums or not page_indices:
         return []
+    # Telugu is token-heavy; give a generous budget per expected question so a long
+    # bilingual page never gets its JSON truncated (a truncated response fails to
+    # parse and silently drops every question on the page).
+    budget = max(3000, 1400 * len(qnums)) + 600 * (len(page_indices) - 1)
     if len(page_indices) == 1:
         img = pdfrender.render_page_png_b64(doc, page_indices[0])
         raw = sap.vision(
             prompts.EXTRACT_SYSTEM,
             prompts.extract_user_prompt(qnums),
             img,
-            max_tokens=2200,
+            max_tokens=budget,
             temperature=0.0,
         )
     else:
@@ -68,12 +83,33 @@ def _extract_page_group(doc, page_indices: list[int], qnums: list[int]) -> list[
         raw = sap.vision_multi(
             prompts.EXTRACT_SYSTEM,
             pages,
-            max_tokens=2200 + 600 * (len(page_indices) - 1),
+            max_tokens=budget,
             temperature=0.0,
         )
     try:
         data = _parse_json(raw)
         return data.get("questions", [])
+    except Exception:
+        return []
+
+
+def _extract_single_question(doc, page_index: int, qnum: int) -> list[dict]:
+    """Focused re-extraction of ONE question the first pass missed.
+
+    Reruns the page alone with a prompt that names the specific question and a
+    large token budget, so a question the model skipped (or a page whose JSON was
+    truncated) gets a second, isolated chance.
+    """
+    img = pdfrender.render_page_png_b64(doc, page_index)
+    raw = sap.vision(
+        prompts.EXTRACT_SYSTEM,
+        prompts.extract_single_question_prompt(qnum),
+        img,
+        max_tokens=3500,
+        temperature=0.0,
+    )
+    try:
+        return _parse_json(raw).get("questions", [])
     except Exception:
         return []
 
@@ -185,9 +221,45 @@ def run_extraction(job_id: str, pdf_bytes: bytes, file_name: str) -> None:
         merged: dict[int, dict] = {}
         for i in sorted(page_results):
             for q in page_results[i]:
-                n = q.get("questionNumber")
-                if isinstance(n, int) and n not in merged:
+                n = _coerce_qnum(q.get("questionNumber"))
+                if n is not None and n not in merged:
                     merged[n] = q
+
+        # ── Validation & recovery ─────────────────────────────────────────────
+        # The text layer tells us EVERY question number the paper contains, so we
+        # know exactly which ones the vision model dropped. Re-extract the missing
+        # ones (one page at a time, focused prompt) and repeat until nothing is
+        # missing or we hit the round cap. This guarantees all 150 are captured
+        # instead of silently settling for 146.
+        expected: dict[int, int] = {}  # qnum -> first page index it appears on
+        for i, nums in enumerate(page_qnums):
+            for n in nums:
+                expected.setdefault(n, i)
+
+        MAX_RECOVERY_ROUNDS = 4
+        for _round in range(MAX_RECOVERY_ROUNDS):
+            missing = sorted(set(expected) - set(merged))
+            if not missing:
+                break
+            _set(job, status="extracting",
+                 message=f"Recovering {len(missing)} missing question(s) "
+                         f"(round {_round + 1})…")
+            recovered = 0
+            for n in missing:
+                try:
+                    for q in _extract_single_question(doc, expected[n], n):
+                        m = _coerce_qnum(q.get("questionNumber"))
+                        if m is not None and m not in merged:
+                            merged[m] = q
+                            recovered += 1
+                except Exception:
+                    continue
+                _set(job, questionsFound=len(merged))
+            # No progress this round → further identical retries won't help; stop.
+            if recovered == 0:
+                break
+
+        still_missing = sorted(set(expected) - set(merged))
 
         questions: list[Question] = []
         for n in sorted(merged):
@@ -212,8 +284,15 @@ def run_extraction(job_id: str, pdf_bytes: bytes, file_name: str) -> None:
              message="Tagging subject, topic, difficulty & writing explanations…")
         _enrich(questions, job)
 
+        expected_total = len(expected)
+        if still_missing:
+            msg = (f"Extracted {len(questions)} of {expected_total} questions. "
+                   f"Could not read Q{', Q'.join(map(str, still_missing))} after "
+                   "several retries — please check those pages in the PDF.")
+        else:
+            msg = f"Extracted all {len(questions)} questions."
         _set(job, status="done", questions=questions,
              stats=_compute_stats(questions),
-             message=f"Extracted {len(questions)} questions.")
+             message=msg)
     except Exception as e:  # noqa: BLE001 — surface any failure to the UI
         _set(job, status="error", error=str(e), message="Extraction failed.")
