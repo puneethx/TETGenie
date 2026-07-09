@@ -53,8 +53,8 @@ EXTRACT_SYSTEM = (
 def extract_user_prompt(expected_qnums: list[int]) -> str:
     hint = ", ".join(str(n) for n in expected_qnums) if expected_qnums else "unknown"
     return (
-        "Extract EVERY question fully visible on this page. "
-        f"Expected question number(s) on this page (from the paper text): {hint}. "
+        "Extract EVERY question visible on this page. "
+        f"Expected question number(s) on this page: {hint}. "
         "For each question return an object with keys: "
         '"questionNumber" (int), "englishQuestion" (str), "teluguQuestion" (str, may be ""), '
         '"options" (array of exactly 4 objects: {"index":1-4,"english":str,"telugu":str}), '
@@ -64,6 +64,35 @@ def extract_user_prompt(expected_qnums: list[int]) -> str:
         "Preserve Telugu script exactly. Skip any question that is only partially visible "
         "(it continues on another page)."
     )
+
+
+def extract_user_prompt_multipage(expected_qnums: list[int], num_pages: int) -> list[str]:
+    """Return per-page text labels for a multi-page question group.
+
+    The first label carries the full extraction instruction; subsequent labels
+    mark the pages as continuations so the model assembles the full question.
+    """
+    hint = ", ".join(str(n) for n in expected_qnums) if expected_qnums else "unknown"
+    labels = []
+    for i in range(num_pages):
+        if i == 0:
+            labels.append(
+                f"Page 1 of {num_pages}. "
+                "The following pages together form a COMPLETE question set — a question whose "
+                "header appears on page 1 may have its body on page 2 and options on page 3. "
+                "Read ALL provided pages before writing your answer. "
+                f"Expected question number(s): {hint}. "
+                "For each question return an object with keys: "
+                '"questionNumber" (int), "englishQuestion" (str), "teluguQuestion" (str, may be ""), '
+                '"options" (array of exactly 4 objects: {"index":1-4,"english":str,"telugu":str}), '
+                '"correctOption" (int 1-4, the GREEN/ticked option; null if none is highlighted), '
+                '"hasDiagram" (bool — true if a figure/diagram/table is needed to answer). '
+                'After viewing ALL pages, respond with JSON: {"questions":[ ... ]} sorted by questionNumber. '
+                "Preserve Telugu script exactly."
+            )
+        else:
+            labels.append(f"Page {i + 1} of {num_pages} (continuation of question {hint}).")
+    return labels
 
 
 ENRICH_SYSTEM = (
