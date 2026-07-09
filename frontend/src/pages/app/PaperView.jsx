@@ -63,7 +63,7 @@ export default function PaperView({ kind = 'py' }) {
     } catch (e) { setError(e.message || 'Could not update.') } finally { setFreeBusy(false) }
   }
 
-  if (loading) return <Splash label="Loading paper…" />
+  if (loading) return <Splash label="Downloading paper…" />
   if (error) return <div className="page"><div className="auth-alert">{error}</div></div>
   if (!paper) return <div className="page"><p className="muted center mt-6">Paper not found.</p></div>
 
