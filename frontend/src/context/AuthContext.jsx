@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const signup = useCallback(async ({ firstName, lastName, email, password }) => {
+  const signup = useCallback(async ({ firstName, lastName, phone, email, password }) => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
       const displayName = [firstName, lastName].filter(Boolean).join(' ').trim()
@@ -74,6 +74,7 @@ export function AuthProvider({ children }) {
         uid: cred.user.uid,
         firstName: firstName.trim(),
         lastName: (lastName || '').trim(),
+        phone: (phone || '').replace(/\s/g, '').trim(),
         email: email.trim().toLowerCase(),
         role: 'user',
         subscription: 'free',
