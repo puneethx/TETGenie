@@ -7,6 +7,7 @@ import {
   validatePassword,
   validateConfirm,
   validateFirstName,
+  validatePhone,
   passwordStrength,
 } from '../lib/validation'
 import Logo from '../components/Logo'
@@ -23,6 +24,7 @@ export default function Signup() {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
+    phone: '',
     email: '',
     password: '',
     confirm: '',
@@ -37,6 +39,7 @@ export default function Signup() {
   function validateAll() {
     return {
       firstName: validateFirstName(form.firstName),
+      phone: validatePhone(form.phone),
       email: validateEmail(form.email),
       password: validatePassword(form.password),
       confirm: validateConfirm(form.password, form.confirm),
@@ -111,6 +114,21 @@ export default function Signup() {
             {errors.firstName}
           </span>
         )}
+
+        <div className="field">
+          <label className="label" htmlFor="phone">Phone number <span className="req">*</span></label>
+          <input
+            id="phone"
+            className={`input ${errors.phone ? 'has-error' : ''}`}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="10-digit mobile number"
+            value={form.phone}
+            onChange={set('phone')}
+          />
+          {errors.phone && <span className="error-text">{errors.phone}</span>}
+        </div>
 
         <div className="field">
           <label className="label" htmlFor="email">Email</label>
