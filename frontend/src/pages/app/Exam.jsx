@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getContentPaper, getContentQuestions, paperBasePath } from '../../lib/content'
 import { saveAttempt } from '../../lib/attempts'
 import { postScore, getLeaderboard } from '../../lib/leaderboard'
+import { addSubjectStats, subjectDeltas } from '../../lib/analytics'
 import { useAuth } from '../../context/AuthContext'
 import { Splash } from '../../components/guards'
 import Icon from '../../components/Icon'
@@ -37,8 +38,13 @@ export default function Exam({ kind = 'py' }) {
   const [showPalette, setShowPalette] = useState(false)
   const [phase, setPhase] = useState('exam')
   const [result, setResult] = useState(null)
-  const [startTs] = useState(() => Date.now())
+  const [startTs, setStartTs] = useState(() => Date.now())
   const [elapsed, setElapsed] = useState(0)
+  const [resumed, setResumed] = useState(false)
+
+  // Where an in-progress attempt is stashed so a refresh / accidental exit
+  // doesn't lose the user's answers.
+  const storageKey = `tetgenie-exam:${kind}:${paperId}:${mode}`
 
   const [topPct, setTopPct] = useState(null)
   const [posted, setPosted] = useState(false)
@@ -53,6 +59,34 @@ export default function Exam({ kind = 'py' }) {
       .then(([p, qs]) => { setPaper(p); setQuestions(qs) })
       .finally(() => setLoading(false))
   }, [kind, paperId])
+
+  // Restore a saved in-progress attempt (resume where you left off).
+  useEffect(() => {
+    if (loading || !questions.length) return
+    try {
+      const raw = localStorage.getItem(storageKey)
+      if (!raw) return
+      const s = JSON.parse(raw)
+      if (s && s.answers && Object.keys(s.answers).length) {
+        setAnswers(s.answers)
+        setRevealed(s.revealed || {})
+        setIdx(Math.min(s.idx || 0, questions.length - 1))
+        if (s.startTs) setStartTs(s.startTs)
+        setResumed(true)
+      }
+    } catch { /* ignore corrupt state */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, questions.length])
+
+  // Persist progress as the user answers (only while actively taking the exam).
+  useEffect(() => {
+    if (loading || phase !== 'exam') return
+    if (!Object.keys(answers).length && idx === 0) return
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ answers, revealed, idx, startTs, mode }))
+    } catch { /* storage full/unavailable */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, revealed, idx, phase, loading])
 
   useEffect(() => {
     if (phase !== 'exam') return
@@ -75,6 +109,19 @@ export default function Exam({ kind = 'py' }) {
   const q = questions[idx]
   const answeredCount = Object.keys(answers).length
   const backPath = paperBasePath(kind, paperId)
+
+  // Leave the exam WITHOUT pushing a new history entry, so the browser/back
+  // button doesn't bounce the user back into the exam they just left.
+  function leaveExam() {
+    localStorage.removeItem(storageKey)
+    if (window.history.state?.idx > 0) navigate(-1)
+    else navigate(backPath, { replace: true })
+  }
+
+  function restart() {
+    localStorage.removeItem(storageKey)
+    setAnswers({}); setRevealed({}); setIdx(0); setStartTs(Date.now()); setResumed(false)
+  }
 
   function choose(optIndex) {
     if (!q) return
@@ -100,8 +147,11 @@ export default function Exam({ kind = 'py' }) {
     const r = grade()
     setResult(r)
     setPhase('result')
+    localStorage.removeItem(storageKey)   // finished → drop the resume snapshot
     window.scrollTo(0, 0)
     try { await saveAttempt({ paperId, paperTitle: paper?.title || '', score: r.correct, total: r.total }) } catch { /* */ }
+    // Feed the home analytics: accumulate correct/total per subject.
+    try { await addSubjectStats(subjectDeltas(questions, answers)) } catch { /* */ }
     // Compute an approximate "top %" from the opt-in leaderboard.
     try {
       const board = await getLeaderboard(paperId)
@@ -183,7 +233,7 @@ export default function Exam({ kind = 'py' }) {
           )}
           <div className="row gap-3">
             <button className="btn btn-primary grow" onClick={() => navigate(0)}>Retake</button>
-            <button className="btn btn-ghost grow" onClick={() => navigate(backPath)}>Done</button>
+            <button className="btn btn-ghost grow" onClick={leaveExam}>Done</button>
           </div>
           <button className="btn btn-ghost btn-block" onClick={() => navigate(`/app/leaderboard?paper=${paperId}`)}>
             <Icon name="trophy" size={16} /> View leaderboard
@@ -213,12 +263,18 @@ export default function Exam({ kind = 'py' }) {
   return (
     <div className="app-frame">
       <div className="exam-top">
-        <button className="icon-btn" onClick={() => navigate(backPath)} aria-label="Exit exam"><Icon name="arrowLeft" size={20} /></button>
+        <button className="icon-btn" onClick={leaveExam} aria-label="Exit exam"><Icon name="arrowLeft" size={20} /></button>
         <div className="exam-progress"><div style={{ width: `${pct}%` }} /></div>
         <span className="exam-timer">⏱ {fmt(elapsed)}</span>
       </div>
 
       <div className="exam-body">
+        {resumed && (
+          <div className="card mb-3" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-2)', borderColor: 'var(--primary)' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>↩ Resumed where you left off</span>
+            <button className="btn btn-ghost" style={{ minHeight: 34, padding: '0 12px', fontSize: 'var(--fs-sm)' }} onClick={restart}>Restart</button>
+          </div>
+        )}
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 'var(--sp-3)' }}>
           <span className="muted" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700 }}>Question {idx + 1} / {questions.length}</span>
           <div className="row gap-2">
