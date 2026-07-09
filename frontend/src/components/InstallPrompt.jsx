@@ -71,9 +71,9 @@ export default function InstallPrompt() {
       ]
     : platform === 'android'
     ? [
-        <>Tap the <strong>⋮ menu</strong> (top-right) in Chrome.</>,
-        <>Tap <strong>“Add to Home screen”</strong> (or “Install app”).</>,
-        <>Confirm <strong>Add</strong> — TETGenie now opens like an app. 🎉</>,
+        <>Tap the <strong>⋮ three-dots menu</strong> at the top-right of Chrome.</>,
+        <>Tap <strong>“Add to Home screen”</strong> (on some phones it says <strong>“Install app”</strong>).</>,
+        <>Tap <strong>Add</strong> / <strong>Install</strong> to confirm — TETGenie now appears on your home screen. 🎉</>,
       ]
     : [
         <>Open your browser menu.</>,
@@ -104,15 +104,22 @@ export default function InstallPrompt() {
           Open TETGenie in one tap, like a real app — no browser bar. మీ ఫోన్‌లో యాప్‌లా తెరవండి.
         </p>
 
-        {canNativeInstall ? (
+        {/* One-tap install when the browser supports it (Chrome/Android/desktop). */}
+        {canNativeInstall && (
           <button className="btn btn-primary btn-lg btn-block" onClick={nativeInstall}>
             <Icon name="plus" size={18} /> Install TETGenie
           </button>
-        ) : (
-          <ol style={{ paddingLeft: '1.2em', display: 'grid', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)', lineHeight: 1.5 }}>
-            {steps.map((s, i) => <li key={i}>{s}</li>)}
-          </ol>
         )}
+
+        {/* Always show the manual steps too — the native prompt isn't offered on
+            every phone, so Android users should still see the ⋮ → "Add to Home
+            screen" guide as a reliable fallback. */}
+        <p className="muted" style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '0.02em', margin: canNativeInstall ? 'var(--sp-4) 0 var(--sp-2)' : '0 0 var(--sp-2)' }}>
+          {canNativeInstall ? 'OR ADD IT MANUALLY' : platform === 'android' ? 'ON ANDROID (CHROME)' : platform === 'ios' ? 'ON IPHONE (SAFARI)' : 'STEPS'}
+        </p>
+        <ol style={{ paddingLeft: '1.2em', display: 'grid', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)', lineHeight: 1.5 }}>
+          {steps.map((s, i) => <li key={i}>{s}</li>)}
+        </ol>
 
         <button className="btn btn-ghost btn-block mt-4" onClick={dismiss}>Maybe later</button>
       </div>
