@@ -50,6 +50,15 @@ class Settings:
     # Set to "1" to skip token verification for local development ONLY.
     DISABLE_AUTH = os.environ.get("DISABLE_AUTH", "") == "1"
 
+    # ── Password reset (forgot-password flow) ──
+    # Shared code the admin hands out on WhatsApp; the user enters it with a new
+    # password. Change it any time via this env var.
+    PASSWORD_RESET_CODE = os.environ.get("PASSWORD_RESET_CODE", "TETFRGTPASS")
+    # Full Firebase service-account JSON (as a single-line string). Required ONLY
+    # for password reset — everything else works without it. Get it from Firebase
+    # Console → Project settings → Service accounts → Generate new private key.
+    FIREBASE_SERVICE_ACCOUNT_JSON = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+
     # ── Extraction tuning ──
     RENDER_DPI = int(os.environ.get("RENDER_DPI", "170"))
     VISION_CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "5"))
