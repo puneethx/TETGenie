@@ -34,6 +34,12 @@ class RegenRequest(BaseModel):
     difficulty: str = "medium"
     avoid: list[str] = []
 
+
+class ResetRequest(BaseModel):
+    email: str
+    code: str
+    newPassword: str
+
 app = FastAPI(title="TETGenie AI Backend", version=__version__)
 
 app.add_middleware(
@@ -123,3 +129,23 @@ def regenerate_question(req: RegenRequest, _admin: dict = Depends(require_admin)
     if not q:
         raise HTTPException(502, "Could not generate a question. Please try again.")
     return {"question": q}
+
+
+@app.post("/reset-password")
+def reset_password_endpoint(req: ResetRequest):
+    """Public: reset a user's password using the shared reset code + new password.
+
+    Not admin-gated (the user is signed out) — protected by the reset code, which
+    the admin shares per request on WhatsApp.
+    """
+    from .reset import reset_password
+    try:
+        reset_password(req.email, req.code, req.newPassword)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    except Exception:
+        # e.g. no user with that email — keep it generic (no account enumeration).
+        raise HTTPException(400, "Could not reset the password. Check the email and code.")
+    return {"ok": True}
