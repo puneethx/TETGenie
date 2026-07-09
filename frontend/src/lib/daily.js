@@ -40,13 +40,14 @@ export async function getDailyOtp(id) {
   return s.exists() ? s.data().otp : null
 }
 
-export async function publishDailyPaper({ date, title, questions, stats, otp }) {
+export async function publishDailyPaper({ date, title, questions, stats, otp, free = false }) {
   const id = newDailyId(date)
   await setDoc(doc(db, 'dailyPapers', id), {
     title: title || `Daily Paper — ${date}`,
     date,
     type: 'daily',
     totalQuestions: questions.length,
+    free: Boolean(free),        // free papers open for everyone, no OTP/Premium
     stats: stats || {},
     published: true,
     createdAt: serverTimestamp(),
@@ -55,6 +56,11 @@ export async function publishDailyPaper({ date, title, questions, stats, otp }) 
   await setDoc(doc(db, 'dailyPapers', id, 'data', 'questions'), { items: questions })
   await setDoc(doc(db, 'dailyPapers', id, 'secure', 'otp'), { otp })
   return id
+}
+
+// Admin: mark a daily paper free (open to all) or back to Premium-only.
+export async function setDailyFree(id, free) {
+  await updateDoc(doc(db, 'dailyPapers', id), { free: Boolean(free) })
 }
 
 // Verify the OTP the user typed and, if correct, record the unlock on their
