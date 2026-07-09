@@ -11,6 +11,7 @@ const FEATURES = [
   { icon: 'calendar', title: 'A fresh paper daily', te: 'ప్రతిరోజూ కొత్త పేపర్', desc: '150 questions each day across all 5 subjects, weighted like the real exam.' },
   { icon: 'check', title: 'Answers + explanations', te: 'జవాబులు + వివరణలు', desc: 'See the correct option with a short 1–2 line reason for every question.' },
   { icon: 'trophy', title: 'Leaderboard & rank', te: 'ర్యాంక్ & లీడర్‌బోర్డ్', desc: 'See where you stand and share your score — practice with the whole community.' },
+  { icon: 'sparkles', title: 'Subject-wise practice', te: 'సబ్జెక్ట్ వారీ సాధన', desc: 'Strengthen weak areas — attempt CDP, Telugu, English, Maths or EVS questions separately, sourced from all previous-year papers.' },
 ]
 
 export default function Home() {
