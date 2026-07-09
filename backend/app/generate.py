@@ -198,6 +198,29 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
                 _set(job, pagesDone=min(done_specs, len(ai_slots)),
                      questionsFound=len(questions))
 
+        # ── 3b. backfill any slots the batched pass missed ──
+        # A batch can drop a slot if the model omits its slotId or returns
+        # invalid JSON. Fill those individually so the paper is always complete.
+        missing = [s for s in slots if s["qnum"] not in questions]
+        if missing:
+            _set(job, message=f"Completing {len(missing)} remaining question(s)…")
+
+            def fill_one(slot):
+                try:
+                    g = generate_one(slot["subject"], slot["topic"], slot["difficulty"], [])
+                    return slot, (g or None)
+                except Exception:
+                    return slot, None
+
+            with cf.ThreadPoolExecutor(max_workers=settings.VISION_CONCURRENCY) as ex:
+                for fut in cf.as_completed([ex.submit(fill_one, s) for s in missing]):
+                    slot, g = fut.result()
+                    if g:
+                        questions[slot["qnum"]] = _to_question(
+                            g, slot["qnum"], slot["subject"], slot["topic"],
+                            slot["difficulty"], "ai")
+                    _set(job, questionsFound=len(questions))
+
         # ── 4. de-duplicate generated questions ──
         _set(job, status="enriching", message="Checking for duplicates…")
         ordered = [questions[n] for n in sorted(questions)]
