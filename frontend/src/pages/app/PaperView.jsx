@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { saveQuestions, deletePaper } from '../../lib/papers'
-import { deleteDailyPaper, getDailyOtp } from '../../lib/daily'
+import { deleteDailyPaper, getDailyOtp, setDailyFree } from '../../lib/daily'
 import { getContentPaper, getContentQuestions, paperBasePath } from '../../lib/content'
 import { getAttempt } from '../../lib/attempts'
 import { useAuth } from '../../context/AuthContext'
@@ -9,6 +9,7 @@ import { Splash } from '../../components/guards'
 import PageHeader from '../../components/PageHeader'
 import Icon from '../../components/Icon'
 import QuestionView from '../../components/QuestionView'
+import QuestionPager from '../../components/QuestionPager'
 import LanguageToggle from '../../components/LanguageToggle'
 import './papers.css'
 
@@ -27,6 +28,7 @@ export default function PaperView({ kind = 'py' }) {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [freeBusy, setFreeBusy] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -51,6 +53,14 @@ export default function PaperView({ kind = 'py' }) {
     if (!window.confirm('Delete this paper permanently?')) return
     if (isDaily) await deleteDailyPaper(paperId); else await deletePaper(paperId)
     navigate(isDaily ? '/app/daily' : '/app/papers')
+  }
+  async function toggleFree() {
+    const next = !paper.free
+    setFreeBusy(true)
+    try {
+      await setDailyFree(paperId, next)
+      setPaper((pp) => ({ ...pp, free: next }))
+    } catch (e) { setError(e.message || 'Could not update.') } finally { setFreeBusy(false) }
   }
 
   if (loading) return <Splash label="Loading paper…" />
@@ -92,18 +102,33 @@ export default function PaperView({ kind = 'py' }) {
       </div>
 
       {isAdmin && (
-        <div className="card mb-4 row gap-2" style={{ justifyContent: 'space-between' }}>
-          <span className="badge badge-admin"><Icon name="shield" size={12} /> Admin</span>
-          <div className="row gap-2">
-            {!isDaily && (editing ? (
-              <button className="btn btn-primary" style={{ minHeight: 40 }} onClick={onSave} disabled={saving}>
-                {saving ? <span className="spinner" /> : 'Save changes'}
-              </button>
-            ) : (
-              <button className="btn btn-ghost" style={{ minHeight: 40 }} onClick={() => setEditing(true)}>Edit answers</button>
-            ))}
-            <button className="btn btn-ghost" style={{ minHeight: 40, color: 'var(--red-500)' }} onClick={onDelete}>Delete</button>
+        <div className="card mb-4 stack gap-3">
+          <div className="row gap-2" style={{ justifyContent: 'space-between' }}>
+            <span className="badge badge-admin"><Icon name="shield" size={12} /> Admin</span>
+            <div className="row gap-2">
+              {!isDaily && (editing ? (
+                <button className="btn btn-primary" style={{ minHeight: 40 }} onClick={onSave} disabled={saving}>
+                  {saving ? <span className="spinner" /> : 'Save changes'}
+                </button>
+              ) : (
+                <button className="btn btn-ghost" style={{ minHeight: 40 }} onClick={() => setEditing(true)}>Edit answers</button>
+              ))}
+              <button className="btn btn-ghost" style={{ minHeight: 40, color: 'var(--red-500)' }} onClick={onDelete}>Delete</button>
+            </div>
           </div>
+          {isDaily && (
+            <div className="row gap-3" style={{ justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-3)' }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{paper.free ? 'Free for everyone' : 'Premium only'}</div>
+                <div className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
+                  {paper.free ? 'Anyone can open this paper — no OTP needed.' : 'Make it free to let all users try a sample.'}
+                </div>
+              </div>
+              <button className={`btn ${paper.free ? 'btn-ghost' : 'btn-gold'}`} style={{ minHeight: 40, padding: '0 14px', flex: 'none' }} onClick={toggleFree} disabled={freeBusy}>
+                {freeBusy ? <span className="spinner" /> : paper.free ? 'Make Premium' : 'Make Free'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -112,11 +137,13 @@ export default function PaperView({ kind = 'py' }) {
         <LanguageToggle value={lang} onChange={setLang} />
       </div>
 
-      <div className="stack gap-4">
-        {questions.map((q, i) => (
+      <QuestionPager
+        items={questions}
+        pageSize={20}
+        renderItem={(q, i) => (
           <QuestionView key={q.id || i} q={q} lang={lang} showAnswer editable={editing} onSetCorrect={(o) => setCorrect(i, o)} />
-        ))}
-      </div>
+        )}
+      />
     </div>
   )
 }
