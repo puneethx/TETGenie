@@ -27,6 +27,16 @@ export function validateFirstName(name) {
   return null
 }
 
+// Phone: require 10 digits (ignoring spaces / +91 prefix). Helps the admin
+// match a WhatsApp payment to the right account.
+export function validatePhone(phone) {
+  const digits = (phone || '').replace(/\D/g, '')
+  if (!digits) return 'Phone number is required'
+  const local = digits.length > 10 ? digits.slice(-10) : digits
+  if (local.length !== 10) return 'Enter a valid 10-digit phone number'
+  return null
+}
+
 // Live strength meter for the signup UI. Returns { score 0-4, label, checks }.
 export function passwordStrength(pw = '') {
   const checks = {
