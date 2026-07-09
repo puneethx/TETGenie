@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import Icon from './Icon'
 import Logo from './Logo'
 import Avatar from './Avatar'
+import InstallPrompt from './InstallPrompt'
 import './shell.css'
 
 // Role-aware bottom navigation. Admins get admin destinations; users get theirs.
@@ -75,6 +76,8 @@ export default function AppShell() {
       <main>
         <Outlet />
       </main>
+
+      <InstallPrompt />
 
       <nav className="bottom-nav" aria-label="Primary">
         {nav.map((item) => (
