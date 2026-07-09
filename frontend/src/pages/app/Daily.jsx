@@ -37,7 +37,7 @@ export default function Daily() {
           <div style={{ fontWeight: 800, fontSize: 'var(--fs-lg)' }}>🔒 Unlock daily papers</div>
           <p style={{ opacity: 0.92, fontSize: 'var(--fs-sm)', marginTop: 4 }}>₹149 for 30 papers · just ₹5/day.</p>
           <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="btn btn-gold btn-block mt-4">
-            <Icon name="share" size={18} /> Join WhatsApp community to buy
+            <Icon name="share" size={18} /> Join WhatsApp community to request Premium
           </a>
         </div>
       )}
@@ -59,7 +59,7 @@ export default function Daily() {
 
       <div className="stack gap-3">
         {papers?.map((p) => {
-          const isUnlocked = isAdmin || unlocked.has(p.id)
+          const isOpen = isAdmin || p.free || unlocked.has(p.id)
           return (
             <Link key={p.id} to={`/app/daily/${p.id}`} className="paper-card">
               <div className="pc-top">
@@ -67,12 +67,16 @@ export default function Daily() {
                   <h3>{p.title || 'Daily Paper'}</h3>
                   <div className="paper-meta">
                     <span><Icon name="calendar" size={13} /> {fmtDate(p.date)}</span>
-                    <span><Icon name="book" size={13} /> {p.totalQuestions || 150} questions</span>
+                    <span><Icon name="book" size={13} /> {p.totalQuestions ?? 0} questions</span>
                   </div>
                 </div>
-                <span className={`badge ${isUnlocked ? 'badge-premium' : 'badge-free'}`} style={isUnlocked ? { background: 'var(--green-500)', color: '#fff' } : undefined}>
-                  {isUnlocked ? 'Open' : <><Icon name="lock" size={11} /> Locked</>}
-                </span>
+                {p.free ? (
+                  <span className="badge badge-premium" style={{ background: 'var(--green-500)', color: '#fff' }}>Free</span>
+                ) : (
+                  <span className={`badge ${isOpen ? 'badge-premium' : 'badge-free'}`} style={isOpen ? { background: 'var(--green-500)', color: '#fff' } : undefined}>
+                    {isOpen ? 'Open' : <><Icon name="lock" size={11} /> Locked</>}
+                  </span>
+                )}
               </div>
             </Link>
           )
