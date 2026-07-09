@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   startGeneration, waitForGeneration, regenerateQuestion, isBackendConfigured,
 } from '../../lib/api'
 import { loadBank } from '../../lib/papers'
 import { publishDailyPaper, makeOtp } from '../../lib/daily'
+import { renderNodeToFile, shareFile } from '../../lib/share'
 import Icon from '../../components/Icon'
 import PageHeader from '../../components/PageHeader'
 import QuestionView from '../../components/QuestionView'
+import QuestionPager from '../../components/QuestionPager'
 import LanguageToggle from '../../components/LanguageToggle'
+import OtpShareCard from '../../components/OtpShareCard'
 import './upload.css'
 
 const STEPS = [
@@ -37,6 +40,35 @@ export default function Generate() {
   const [regenBusy, setRegenBusy] = useState(null)
   const [otp, setOtp] = useState('')
   const [postedId, setPostedId] = useState('')
+  const otpCardRef = useRef(null)
+  const otpFileRef = useRef(null)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareMsg, setShareMsg] = useState('')
+
+  // Pre-render the OTP image as soon as the posted screen appears, so tapping
+  // Share opens the native sheet instantly (mobile blocks slow share calls).
+  useEffect(() => {
+    if (phase !== 'posted') return
+    let alive = true
+    const t = setTimeout(async () => {
+      const file = await renderNodeToFile(otpCardRef.current, 'tetgenie-otp.png')
+      if (alive) otpFileRef.current = file
+    }, 350)
+    return () => { alive = false; clearTimeout(t) }
+  }, [phase, otp])
+
+  async function shareOtpImage() {
+    setShareBusy(true); setShareMsg('')
+    try {
+      let file = otpFileRef.current
+      if (!file) file = await renderNodeToFile(otpCardRef.current, 'tetgenie-otp.png')
+      const outcome = await shareFile(file, `TETGenie daily paper OTP: ${otp}`)
+      if (outcome === 'downloaded') setShareMsg('Image saved — attach it in the WhatsApp community. 📎')
+      else if (outcome === 'failed') setShareMsg('Sharing unavailable — please screenshot the card.')
+    } finally {
+      setShareBusy(false)
+    }
+  }
 
   async function onGenerate() {
     setError('')
@@ -132,18 +164,28 @@ export default function Generate() {
   if (phase === 'posted') {
     return (
       <div className="page">
+        {/* Hidden capture card (offscreen) */}
+        <div style={{ position: 'absolute', left: -9999, top: 0 }} aria-hidden>
+          <OtpShareCard ref={otpCardRef} otp={otp} title={title} date={date} />
+        </div>
+
         <div className="result-card mb-4" style={{ background: 'var(--grad-gold)', color: '#3a2600' }}>
           <div style={{ fontWeight: 800 }}>Paper posted! 🎉</div>
           <p style={{ fontSize: 'var(--fs-sm)', opacity: 0.85, marginTop: 4 }}>Share this OTP with Premium members on WhatsApp</p>
           <div style={{ fontSize: '3rem', fontWeight: 850, letterSpacing: '0.15em', marginTop: 'var(--sp-3)' }}>{otp}</div>
         </div>
+
+        <button className="btn btn-gold btn-block mb-3" onClick={shareOtpImage} disabled={shareBusy}>
+          {shareBusy ? <span className="spinner" /> : <><Icon name="share" size={18} /> Share OTP as image</>}
+        </button>
+        {shareMsg && <p className="muted center mb-3" style={{ fontSize: 'var(--fs-sm)' }}>{shareMsg}</p>}
         <button className="btn btn-ghost btn-block mb-3" onClick={() => { navigator.clipboard?.writeText(otp); }}>
-          <Icon name="share" size={18} /> Copy OTP
+          <Icon name="book" size={18} /> Copy OTP text
         </button>
         <button className="btn btn-primary btn-block" onClick={() => navigate(`/app/daily/${postedId}`)}>
           View the paper
         </button>
-        <button className="btn btn-ghost btn-block mt-3" onClick={() => { setPhase('idle'); setQuestions([]); setJob(null); setDate(today()); setTitle('') }}>
+        <button className="btn btn-ghost btn-block mt-3" onClick={() => { setPhase('idle'); setQuestions([]); setJob(null); setDate(today()); setTitle(''); setShareMsg(''); otpFileRef.current = null }}>
           Generate another
         </button>
       </div>
@@ -178,8 +220,10 @@ export default function Generate() {
           <LanguageToggle value={lang} onChange={setLang} />
         </div>
 
-        <div className="stack gap-4">
-          {questions.map((q, i) => (
+        <QuestionPager
+          items={questions}
+          pageSize={20}
+          renderItem={(q, i) => (
             <div key={q.id || i} style={{ position: 'relative' }}>
               <QuestionView q={q} lang={lang} showAnswer />
               <div className="row gap-2 mt-2" style={{ justifyContent: 'flex-end' }}>
@@ -200,8 +244,8 @@ export default function Generate() {
                 )}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
 
         <div className="publish-bar">
           <button className="btn btn-gold btn-lg btn-block" onClick={onPost} disabled={phase === 'posting'}>
