@@ -42,3 +42,7 @@ class JobStatus(BaseModel):
     fileName: str = ""
     questions: list[Question] = []
     stats: dict = {}
+    # How many questions the paper's text layer says exist (e.g. 150), and which
+    # of those numbers could NOT be extracted — so the admin can add them by hand.
+    expectedTotal: int = 0
+    missingQuestions: list[int] = []
