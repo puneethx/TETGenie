@@ -46,18 +46,31 @@ def _parse_json(raw: str) -> dict:
     return json.loads(raw)
 
 
-def _extract_page(doc, page_index: int) -> list[dict]:
-    qnums = pdfrender.page_question_numbers(doc, page_index)
-    if not qnums:
-        return []  # divider / instruction page — nothing to extract
-    img = pdfrender.render_page_png_b64(doc, page_index)
-    raw = sap.vision(
-        prompts.EXTRACT_SYSTEM,
-        prompts.extract_user_prompt(qnums),
-        img,
-        max_tokens=2200,
-        temperature=0.0,
-    )
+def _extract_page_group(doc, page_indices: list[int], qnums: list[int]) -> list[dict]:
+    """Extract questions from one or more consecutive pages that belong together."""
+    if not qnums or not page_indices:
+        return []
+    if len(page_indices) == 1:
+        img = pdfrender.render_page_png_b64(doc, page_indices[0])
+        raw = sap.vision(
+            prompts.EXTRACT_SYSTEM,
+            prompts.extract_user_prompt(qnums),
+            img,
+            max_tokens=2200,
+            temperature=0.0,
+        )
+    else:
+        labels = prompts.extract_user_prompt_multipage(qnums, len(page_indices))
+        pages = [
+            (labels[i], pdfrender.render_page_png_b64(doc, page_indices[i]))
+            for i in range(len(page_indices))
+        ]
+        raw = sap.vision_multi(
+            prompts.EXTRACT_SYSTEM,
+            pages,
+            max_tokens=2200 + 600 * (len(page_indices) - 1),
+            temperature=0.0,
+        )
     try:
         data = _parse_json(raw)
         return data.get("questions", [])
@@ -135,18 +148,35 @@ def run_extraction(job_id: str, pdf_bytes: bytes, file_name: str) -> None:
         doc = pdfrender.open_pdf(pdf_bytes)
         total = doc.page_count
         _set(job, totalPages=total, status="extracting",
-             message="Reading questions from each page…")
+             message="Grouping pages and reading questions…")
+
+        # Pre-pass: find question numbers in each page's text layer (fast, no LLM).
+        page_qnums = [pdfrender.page_question_numbers(doc, i) for i in range(total)]
+
+        # Group pages: a page with question numbers starts a new group; a page
+        # with no question numbers is a continuation of the previous group.
+        # key = first page index of the group, value = (page_indices, qnums).
+        groups: list[tuple[list[int], list[int]]] = []
+        for i in range(total):
+            if page_qnums[i]:
+                groups.append(([i], page_qnums[i]))
+            elif groups:
+                groups[-1][0].append(i)
+            # else: pages before the first question (cover/instructions) — skip
 
         page_results: dict[int, list[dict]] = {}
         done = 0
         with cf.ThreadPoolExecutor(max_workers=settings.VISION_CONCURRENCY) as ex:
-            futures = {ex.submit(_extract_page, doc, i): i for i in range(total)}
+            futures = {
+                ex.submit(_extract_page_group, doc, g_pages, g_qnums): g_pages[0]
+                for g_pages, g_qnums in groups
+            }
             for fut in cf.as_completed(futures):
-                i = futures[fut]
+                key = futures[fut]
                 try:
-                    page_results[i] = fut.result()
+                    page_results[key] = fut.result()
                 except Exception:
-                    page_results[i] = []
+                    page_results[key] = []
                 done += 1
                 found = sum(len(v) for v in page_results.values())
                 _set(job, pagesDone=done, questionsFound=found)
