@@ -1,9 +1,11 @@
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
+import AnalyticsCard from '../../components/AnalyticsCard'
 
 const TILES = [
   { to: '/app/papers', icon: 'book', title: 'Previous-year papers', desc: 'Free for everyone', tag: 'Free', tone: 'green' },
+  { to: '/app/subjects', icon: 'sparkles', title: 'Subject-wise practice', desc: 'Practice one subject at a time', tag: 'Free', tone: 'green' },
   { to: '/app/daily', icon: 'calendar', title: 'Daily mock papers', desc: 'A new paper every day', tag: 'Premium', tone: 'gold' },
   { to: '/app/leaderboard', icon: 'trophy', title: 'Leaderboard', desc: 'See your rank', tag: null },
 ]
@@ -46,6 +48,8 @@ export default function Dashboard() {
           </Link>
         )}
       </div>
+
+      <AnalyticsCard />
 
       <div className="stack gap-3">
         {TILES.map((t) => (
