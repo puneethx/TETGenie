@@ -154,3 +154,58 @@
   margin-top: var(--sp-6);
   line-height: 1.7;
 }
+
+/* Telugu subheading in the hero */
+.hero .hero-te {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: var(--fs-base);
+  margin-top: var(--sp-3);
+  max-width: 34ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* "This month only" ribbon + struck-through original price */
+.offer-ribbon {
+  display: inline-block;
+  background: var(--gold-500, #f59e0b);
+  color: #3a2600;
+  font-weight: 800;
+  font-size: var(--fs-xs);
+  padding: 4px 12px;
+  border-radius: var(--r-full);
+  margin-bottom: var(--sp-3);
+  position: relative;
+  z-index: 1;
+}
+.offer .price-old {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Telugu intro block */
+.intro-te {
+  padding: var(--sp-4);
+  margin: var(--sp-5) 0;
+}
+.intro-te h4 {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  margin-bottom: var(--sp-2);
+}
+.intro-te p {
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1.85;
+}
+.intro-te strong { color: var(--text); }
+
+/* Telugu tag on each feature title */
+.feature .f-te {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
