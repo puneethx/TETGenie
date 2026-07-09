@@ -43,7 +43,7 @@ export default function Account() {
             rel="noreferrer"
             className="btn btn-gold btn-block mt-4"
           >
-            <Icon name="share" size={18} /> Join WhatsApp community to buy
+            <Icon name="share" size={18} /> Join WhatsApp community to request Premium
           </a>
           <p style={{ opacity: 0.85, fontSize: 'var(--fs-xs)', marginTop: 'var(--sp-3)', textAlign: 'center' }}>
             After payment, your account is upgraded to Premium.
