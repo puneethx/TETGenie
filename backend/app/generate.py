@@ -200,18 +200,22 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
 
         # ── 3b. backfill any slots the batched pass missed ──
         # A batch can drop a slot if the model omits its slotId or returns
-        # invalid JSON. Fill those individually so the paper is always complete.
-        missing = [s for s in slots if s["qnum"] not in questions]
-        if missing:
-            _set(job, message=f"Completing {len(missing)} remaining question(s)…")
+        # invalid JSON. We retry the missing slots in several rounds so the paper
+        # reliably reaches the full 150 — the model re-generates exactly the
+        # topics/difficulties that are still empty.
+        def fill_one(slot):
+            try:
+                g = generate_one(slot["subject"], slot["topic"], slot["difficulty"], [])
+                return slot, (g or None)
+            except Exception:
+                return slot, None
 
-            def fill_one(slot):
-                try:
-                    g = generate_one(slot["subject"], slot["topic"], slot["difficulty"], [])
-                    return slot, (g or None)
-                except Exception:
-                    return slot, None
-
+        for round_no in range(4):  # up to 4 passes chasing the last few
+            missing = [s for s in slots if s["qnum"] not in questions]
+            if not missing:
+                break
+            _set(job, message=f"Completing {len(missing)} remaining question(s)… "
+                              f"(pass {round_no + 1})")
             with cf.ThreadPoolExecutor(max_workers=settings.VISION_CONCURRENCY) as ex:
                 for fut in cf.as_completed([ex.submit(fill_one, s) for s in missing]):
                     slot, g = fut.result()
@@ -269,10 +273,14 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
         for s in slots:
             by_source[s["source"]] = by_source.get(s["source"], 0) + 1
 
+        expected = len(slots)
+        missing_numbers = [s["qnum"] for s in slots if s["qnum"] not in questions]
         _set(job, status="done", questions=[questions[n] for n in sorted(questions)],
-             stats={"total": len(questions), "bySubject": by_subject_c,
+             stats={"total": len(questions), "expected": expected,
+                    "missingNumbers": missing_numbers,
+                    "bySubject": by_subject_c,
                     "byDifficulty": by_difficulty, "bySource": by_source,
                     "duplicatesFlagged": dup_count},
-             message=f"Generated {len(questions)} questions.")
+             message=f"Generated {len(questions)} of {expected} questions.")
     except Exception as e:  # noqa: BLE001
         _set(job, status="error", error=str(e), message="Generation failed.")
