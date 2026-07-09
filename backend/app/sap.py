@@ -19,21 +19,26 @@ class SapAiCore:
         self._token_exp = 0.0
         self._lock = threading.Lock()
         self._session = requests.Session()
-        # Bypass any corporate proxy for SAP AI Core and its auth endpoint.
-        # The Infosys proxy blocks direct calls to these SAP/Hana domains.
-        no_proxy = {"https": None, "http": None}
-        self._session.proxies.update(no_proxy)
+        # Disable all environment-based proxy detection (HTTP_PROXY, HTTPS_PROXY,
+        # etc.) — Render/Infosys proxies block direct calls to SAP/Hana domains,
+        # and `proxies={https: None}` alone isn't enough because requests still
+        # merges env vars when trust_env is True.
+        self._session.trust_env = False
 
     # ── OAuth2 client-credentials token, cached until ~1 min before expiry ──
     def _get_token(self) -> str:
         with self._lock:
             if self._token and time.time() < self._token_exp - 60:
                 return self._token
+            # proxies={} on every call is belt-and-suspenders: even if a
+            # network-level or OS-level proxy sneaks through trust_env=False,
+            # the per-request empty dict forces urllib3 to go direct.
             resp = self._session.post(
                 settings.auth_url,
                 data={"grant_type": "client_credentials"},
                 auth=(settings.AICORE_CLIENT_ID, settings.AICORE_CLIENT_SECRET),
                 timeout=30,
+                proxies={},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -61,24 +66,36 @@ class SapAiCore:
                 }
             }
         }
-        # One retry on transient auth/5xx: refresh token and try again.
-        for attempt in range(2):
-            resp = self._session.post(
-                settings.deployment_url + "/completion",
-                headers=self._headers(),
-                json=body,
-                timeout=180,
-            )
-            if resp.status_code == 401 and attempt == 0:
+        # Retry on transient errors: auth refresh (401), server errors (5xx),
+        # and connection-level failures (proxy errors, dropped connections).
+        for attempt in range(3):
+            try:
+                resp = self._session.post(
+                    settings.deployment_url + "/completion",
+                    headers=self._headers(),
+                    json=body,
+                    timeout=180,
+                    proxies={},  # force direct — overrides any OS/env proxy
+                )
+            except requests.exceptions.ProxyError:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+            except requests.exceptions.ConnectionError:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+            if resp.status_code == 401 and attempt < 2:
                 self._token = None
                 continue
-            if resp.status_code >= 500 and attempt == 0:
+            if resp.status_code >= 500 and attempt < 2:
                 time.sleep(1.5)
                 continue
             resp.raise_for_status()
             data = resp.json()
             return data["orchestration_result"]["choices"][0]["message"]["content"]
-        resp.raise_for_status()
         return ""
 
     def chat(self, system: str, user: str, max_tokens: int = 2000, temperature: float = 0.2) -> str:
