@@ -93,20 +93,23 @@ def _extract_page_group(doc, page_indices: list[int], qnums: list[int]) -> list[
         return []
 
 
-def _extract_single_question(doc, page_index: int, qnum: int) -> list[dict]:
+def _extract_single_question(doc, page_index: int, qnum: int,
+                             temperature: float = 0.0,
+                             dpi: int | None = None) -> list[dict]:
     """Focused re-extraction of ONE question the first pass missed.
 
     Reruns the page alone with a prompt that names the specific question and a
-    large token budget, so a question the model skipped (or a page whose JSON was
-    truncated) gets a second, isolated chance.
+    large token budget. `temperature` and `dpi` are varied across recovery rounds
+    so a stuck deterministic decode gets a genuinely different attempt (a higher
+    DPI also gives the model a sharper, more readable image).
     """
-    img = pdfrender.render_page_png_b64(doc, page_index)
+    img = pdfrender.render_page_png_b64(doc, page_index, dpi=dpi)
     raw = sap.vision(
         prompts.EXTRACT_SYSTEM,
         prompts.extract_single_question_prompt(qnum),
         img,
         max_tokens=3500,
-        temperature=0.0,
+        temperature=temperature,
     )
     try:
         return _parse_json(raw).get("questions", [])
@@ -236,28 +239,34 @@ def run_extraction(job_id: str, pdf_bytes: bytes, file_name: str) -> None:
             for n in nums:
                 expected.setdefault(n, i)
 
-        MAX_RECOVERY_ROUNDS = 4
-        for _round in range(MAX_RECOVERY_ROUNDS):
+        # Each round ESCALATES temperature and render DPI. Retrying at temp 0 with
+        # the same image is deterministic — it returns the identical failure — so
+        # every attempt raises the temperature (breaks a stuck decode) and the DPI
+        # (a sharper image the model can actually read). We loop until EVERY
+        # expected question is captured; the schedule length is only an
+        # infinite-loop / runaway-cost backstop, not a "good enough" cut-off.
+        RECOVERY_SCHEDULE = [
+            (0.0, 220), (0.2, 260), (0.4, 300), (0.6, 320),
+            (0.8, 350), (1.0, 400), (0.5, 400), (0.9, 450),
+        ]
+        for attempt, (temp, dpi) in enumerate(RECOVERY_SCHEDULE, start=1):
             missing = sorted(set(expected) - set(merged))
             if not missing:
                 break
             _set(job, status="extracting",
-                 message=f"Recovering {len(missing)} missing question(s) "
-                         f"(round {_round + 1})…")
-            recovered = 0
+                 message=f"Recovering {len(missing)} missing question(s) — "
+                         f"attempt {attempt} of {len(RECOVERY_SCHEDULE)} "
+                         f"(sharper image, retry)…")
             for n in missing:
                 try:
-                    for q in _extract_single_question(doc, expected[n], n):
+                    for q in _extract_single_question(doc, expected[n], n,
+                                                      temperature=temp, dpi=dpi):
                         m = _coerce_qnum(q.get("questionNumber"))
                         if m is not None and m not in merged:
                             merged[m] = q
-                            recovered += 1
                 except Exception:
                     continue
                 _set(job, questionsFound=len(merged))
-            # No progress this round → further identical retries won't help; stop.
-            if recovered == 0:
-                break
 
         still_missing = sorted(set(expected) - set(merged))
 
