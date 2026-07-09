@@ -302,6 +302,8 @@ def run_extraction(job_id: str, pdf_bytes: bytes, file_name: str) -> None:
             msg = f"Extracted all {len(questions)} questions."
         _set(job, status="done", questions=questions,
              stats=_compute_stats(questions),
+             expectedTotal=expected_total,
+             missingQuestions=still_missing,
              message=msg)
     except Exception as e:  # noqa: BLE001 — surface any failure to the UI
         _set(job, status="error", error=str(e), message="Extraction failed.")
