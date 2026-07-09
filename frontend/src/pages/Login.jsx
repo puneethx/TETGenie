@@ -87,6 +87,12 @@ export default function Login() {
         </button>
       </form>
 
+      <p className="center mt-3">
+        <Link to="/forgot-password" className="muted" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>
+          Forgot password?
+        </Link>
+      </p>
+
       <p className="auth-switch">
         New to TETGenie? <Link to="/signup">Create an account</Link>
       </p>
