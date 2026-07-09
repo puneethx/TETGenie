@@ -82,6 +82,18 @@ export async function waitForGeneration(jobId, onProgress, intervalMs = 2500) {
   }
 }
 
+// Forgot-password: reset via the shared code (admin gives it out on WhatsApp).
+export async function resetPassword({ email, code, newPassword }) {
+  if (!BASE) throw new Error('Password reset is not available yet — the backend URL is not configured.')
+  const res = await fetch(`${BASE}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, newPassword }),
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
 // Regenerate a single question at a chosen difficulty (admin verify screen).
 export async function regenerateQuestion({ subject, topic, difficulty, avoid = [] }) {
   const res = await fetch(`${BASE}/generate/question`, {
