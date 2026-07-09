@@ -37,7 +37,7 @@ export default function Daily() {
           <div style={{ fontWeight: 800, fontSize: 'var(--fs-lg)' }}>🔒 Unlock daily papers</div>
           <p style={{ opacity: 0.92, fontSize: 'var(--fs-sm)', marginTop: 4 }}>₹149 for 30 papers · just ₹5/day.</p>
           <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="btn btn-gold btn-block mt-4">
-            <Icon name="share" size={18} /> Join WhatsApp community to request Premium
+            <Icon name="share" size={18} /> Join WhatsApp community
           </a>
         </div>
       )}
