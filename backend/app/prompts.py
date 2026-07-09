@@ -95,6 +95,24 @@ def extract_user_prompt_multipage(expected_qnums: list[int], num_pages: int) -> 
     return labels
 
 
+def extract_single_question_prompt(qnum: int) -> str:
+    """Focused prompt to recover a single question the batch pass missed."""
+    return (
+        f"This page contains question number {qnum}. Your ONLY task is to extract question "
+        f"{qnum} COMPLETELY and accurately — do not skip it. It has a question stem plus 4 "
+        "options, usually in BOTH English and Telugu (Language II English grammar items may be "
+        "English-only — then leave Telugu fields as empty strings; never invent a translation). "
+        "The CORRECT option is shown in GREEN and/or with a green tick icon. "
+        "Return an object with keys: "
+        f'"questionNumber" (int, must be {qnum}), "englishQuestion" (str), '
+        '"teluguQuestion" (str, may be ""), '
+        '"options" (array of exactly 4 objects: {"index":1-4,"english":str,"telugu":str}), '
+        '"correctOption" (int 1-4, the GREEN/ticked option; null if none is highlighted), '
+        '"hasDiagram" (bool). Preserve Telugu script exactly. '
+        'Respond with STRICT JSON only: {"questions":[ ... ]} — no markdown, no commentary.'
+    )
+
+
 ENRICH_SYSTEM = (
     "You are an AP TET (SGT Paper I) subject expert and bilingual (Telugu/English) educator. "
     "For each exam question you are given, classify it and write a short explanation. "
