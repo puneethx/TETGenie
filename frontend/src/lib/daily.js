@@ -63,6 +63,12 @@ export async function setDailyFree(id, free) {
   await updateDoc(doc(db, 'dailyPapers', id), { free: Boolean(free) })
 }
 
+// Admin: overwrite a daily paper's questions (edit answers / add missing ones).
+export async function saveDailyQuestions(id, questions) {
+  await setDoc(doc(db, 'dailyPapers', id, 'data', 'questions'), { items: questions })
+  await updateDoc(doc(db, 'dailyPapers', id), { totalQuestions: questions.length })
+}
+
 // Verify the OTP the user typed and, if correct, record the unlock on their
 // own profile. (OTP read requires Premium — enforced by rules.)
 export async function unlockDaily(id, entered) {
