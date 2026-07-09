@@ -39,7 +39,7 @@ export default function DailyGate({ children }) {
             150-question paper every day for ₹149/30 days (₹5/day).
           </p>
           <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="btn btn-gold btn-block mt-4">
-            <Icon name="share" size={18} /> Join WhatsApp community to request Premium
+            <Icon name="share" size={18} /> Join WhatsApp community
           </a>
         </div>
       </div>
