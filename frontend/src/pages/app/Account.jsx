@@ -56,13 +56,24 @@ export default function Account() {
         <button
           onClick={toggleTheme}
           className="row gap-3"
-          style={{ width: '100%', padding: 'var(--sp-4)', justifyContent: 'space-between', background: 'none' }}
+          style={{ width: '100%', padding: 'var(--sp-4)', justifyContent: 'space-between', background: 'none', borderBottom: '1px solid var(--border)' }}
         >
           <span className="row gap-3">
             <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={20} />
             Appearance
           </span>
           <span className="muted" style={{ textTransform: 'capitalize' }}>{theme}</span>
+        </button>
+        <button
+          onClick={() => window.dispatchEvent(new Event('tetgenie:install'))}
+          className="row gap-3"
+          style={{ width: '100%', padding: 'var(--sp-4)', justifyContent: 'space-between', background: 'none' }}
+        >
+          <span className="row gap-3">
+            <Icon name="plus" size={20} />
+            Add to Home Screen
+          </span>
+          <Icon name="chevronRight" size={18} className="faint" />
         </button>
       </div>
 
