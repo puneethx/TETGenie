@@ -5,6 +5,7 @@ import { publishPaper } from '../../lib/papers'
 import Icon from '../../components/Icon'
 import PageHeader from '../../components/PageHeader'
 import QuestionView from '../../components/QuestionView'
+import QuestionEditor from '../../components/QuestionEditor'
 import LanguageToggle from '../../components/LanguageToggle'
 import './upload.css'
 
@@ -43,6 +44,7 @@ export default function Upload() {
   const [lang, setLang] = useState('both')
   const [error, setError] = useState('')
   const [onlyIssues, setOnlyIssues] = useState(false)
+  const [adding, setAdding] = useState(null) // null | { suggestedNumber }
 
   function pickFile(f) {
     if (!f) return
@@ -79,6 +81,16 @@ export default function Upload() {
 
   function setCorrect(qIdx, optIndex) {
     setQuestions((qs) => qs.map((q, i) => (i === qIdx ? { ...q, correctOption: optIndex } : q)))
+  }
+
+  // Insert a manually-added question, keeping the list ordered by questionNumber
+  // and replacing any existing entry with the same number.
+  function addQuestion(newQ) {
+    setQuestions((qs) => {
+      const rest = qs.filter((q) => q.questionNumber !== newQ.questionNumber)
+      return [...rest, newQ].sort((a, b) => a.questionNumber - b.questionNumber)
+    })
+    setAdding(null)
   }
 
   async function onPublish() {
@@ -155,9 +167,30 @@ export default function Upload() {
 
     const shown = onlyIssues ? issues.map((x) => x.i) : questions.map((_, i) => i)
 
+    // What the paper *should* contain vs what we have, so the admin can add the
+    // leftover questions by hand. `expectedTotal` comes from the PDF's text layer
+    // (e.g. 150); we recompute the gap against the current list each render so it
+    // shrinks as the admin adds questions.
+    const presentNumbers = new Set(questions.map((q) => q.questionNumber))
+    const expectedTotal = job?.expectedTotal || 0
+    let missing = []
+    if (expectedTotal) {
+      missing = Array.from({ length: expectedTotal }, (_, k) => k + 1).filter((n) => !presentNumbers.has(n))
+    } else if (job?.missingQuestions?.length) {
+      missing = job.missingQuestions.filter((n) => !presentNumbers.has(n))
+    }
+    const nextNumber = questions.length
+      ? Math.max(...questions.map((q) => q.questionNumber)) + 1
+      : 1
+
     return (
       <div className="page">
-        <PageHeader title="Review & publish" subtitle={`${questions.length} questions extracted`} />
+        <PageHeader
+          title="Review & publish"
+          subtitle={expectedTotal
+            ? `${questions.length} of ${expectedTotal} questions`
+            : `${questions.length} questions extracted`}
+        />
 
         <div className="review-stats mb-4">
           <div className="stat-tile"><div className="n">{stats.total ?? questions.length}</div><div className="l">Questions</div></div>
@@ -165,6 +198,33 @@ export default function Upload() {
           <div className="stat-tile"><div className="n" style={{ color: 'var(--green-500)' }}>{stats.byDifficulty?.easy ?? 0}</div><div className="l">Easy</div></div>
           <div className="stat-tile"><div className="n" style={{ color: issues.length ? 'var(--gold-600)' : 'var(--green-500)' }}>{issues.length}</div><div className="l">To review</div></div>
         </div>
+
+        {missing.length > 0 && (
+          <div className="auth-alert" style={{ color: 'var(--red-500)', background: 'color-mix(in srgb, var(--red-500) 10%, var(--surface))', borderColor: 'color-mix(in srgb, var(--red-500) 40%, transparent)' }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>
+              {missing.length} question(s) couldn’t be read from the PDF{expectedTotal ? ` (${questions.length} of ${expectedTotal})` : ''}. Add each one by hand:
+            </div>
+            <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
+              {missing.map((n) => (
+                <button
+                  key={n}
+                  className="q-chip"
+                  style={{ cursor: 'pointer', borderColor: 'var(--red-500)', color: 'var(--red-500)' }}
+                  onClick={() => setAdding({ suggestedNumber: n })}
+                >
+                  + Add Q{n}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          className="btn btn-ghost btn-block mb-4"
+          onClick={() => setAdding({ suggestedNumber: missing[0] || nextNumber })}
+        >
+          <Icon name="plus" size={18} /> Add a question manually
+        </button>
 
         {issues.length > 0 && (
           <div className="auth-alert" style={{ color: 'var(--gold-600)', background: 'color-mix(in srgb, var(--gold-500) 12%, var(--surface))', borderColor: 'color-mix(in srgb, var(--gold-500) 40%, transparent)' }}>
@@ -237,6 +297,15 @@ export default function Upload() {
             {phase === 'publishing' ? <span className="spinner" /> : <>Publish paper <Icon name="check" size={18} strokeWidth={3} /></>}
           </button>
         </div>
+
+        {adding && (
+          <QuestionEditor
+            suggestedNumber={adding.suggestedNumber}
+            existingNumbers={presentNumbers}
+            onSave={addQuestion}
+            onCancel={() => setAdding(null)}
+          />
+        )}
       </div>
     )
   }
