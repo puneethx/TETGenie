@@ -25,12 +25,13 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
-  overscroll-behavior-y: none;
-}
-
-/* Prevent horizontal scroll on mobile no matter what */
-html,
-body {
+  /* Clip only sideways drift. Vertical scrolling stays on the normal document
+     flow so it behaves identically on desktop, Android and iOS.
+     IMPORTANT: keep overflow-x ONLY on <body>, never on <html> — putting it on
+     <html> makes <html> its own scroll container and silently breaks page
+     scrolling on many desktop/Android engines (iOS tolerates it, which is why it
+     "worked" only on iPhone). */
+  width: 100%;
   max-width: 100%;
   overflow-x: hidden;
 }
