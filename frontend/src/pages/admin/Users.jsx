@@ -44,6 +44,7 @@ export default function Users() {
     if (!s) return true
     return (
       (u.email || '').toLowerCase().includes(s) ||
+      (u.phone || '').includes(s) ||
       (`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().includes(s)
     )
   })
@@ -66,7 +67,7 @@ export default function Users() {
 
       <input
         className="input mb-4"
-        placeholder="Search by name or email"
+        placeholder="Search by name, email or phone"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
@@ -93,6 +94,12 @@ export default function Users() {
                 <div className="muted" style={{ fontSize: 'var(--fs-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {u.email}
                 </div>
+                {u.phone && (
+                  <a href={`https://wa.me/91${u.phone.replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noreferrer"
+                     className="muted" style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>
+                    📱 {u.phone}
+                  </a>
+                )}
               </div>
               {!isAdmin && (
                 <button
