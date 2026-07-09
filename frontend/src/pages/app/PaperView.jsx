@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { saveQuestions, deletePaper } from '../../lib/papers'
-import { deleteDailyPaper, getDailyOtp, setDailyFree } from '../../lib/daily'
+import { deleteDailyPaper, getDailyOtp, setDailyFree, saveDailyQuestions } from '../../lib/daily'
 import { getContentPaper, getContentQuestions, paperBasePath } from '../../lib/content'
 import { getAttempt } from '../../lib/attempts'
+import { regenerateQuestion, isBackendConfigured } from '../../lib/api'
+import { subjectNameForQnum } from '../../lib/subjects'
 import { useAuth } from '../../context/AuthContext'
 import { Splash } from '../../components/guards'
 import PageHeader from '../../components/PageHeader'
@@ -29,6 +31,8 @@ export default function PaperView({ kind = 'py' }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [freeBusy, setFreeBusy] = useState(false)
+  const [genMsg, setGenMsg] = useState('')
+  const [genBusy, setGenBusy] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -46,8 +50,46 @@ export default function PaperView({ kind = 'py' }) {
   }
   async function onSave() {
     setSaving(true)
-    try { await saveQuestions(paperId, questions); setEditing(false) }
-    catch (e) { setError(e.message || 'Save failed.') } finally { setSaving(false) }
+    try {
+      if (isDaily) await saveDailyQuestions(paperId, questions)
+      else await saveQuestions(paperId, questions)
+      setEditing(false)
+    } catch (e) { setError(e.message || 'Save failed.') } finally { setSaving(false) }
+  }
+
+  // Generate the questions whose numbers are missing (paper came out short) and
+  // splice them in, in order, then save.
+  async function generateMissing(missingNums) {
+    if (!isBackendConfigured) { setError('AI backend URL is not set (VITE_AI_BACKEND_URL).'); return }
+    setGenBusy(true); setError('')
+    const created = []
+    try {
+      for (let i = 0; i < missingNums.length; i++) {
+        const n = missingNums[i]
+        setGenMsg(`Generating question ${n} (${i + 1} of ${missingNums.length})…`)
+        const subject = subjectNameForQnum(n)
+        const nq = await regenerateQuestion({ subject, topic: '', difficulty: 'medium', avoid: [] })
+        created.push({
+          id: `q${n}`, questionNumber: n, subject,
+          englishQuestion: nq.englishQuestion || '', teluguQuestion: nq.teluguQuestion || '',
+          options: nq.options || [], correctOption: nq.correctOption ?? null,
+          topic: nq.topic || '', difficulty: nq.difficulty || 'medium',
+          explanation: nq.explanation || '', explanationTelugu: nq.explanationTelugu || '',
+          hasDiagram: false,
+        })
+      }
+      const merged = [...questions, ...created].sort((a, b) => (a.questionNumber || 0) - (b.questionNumber || 0))
+      setQuestions(merged)
+      setGenMsg('Saving…')
+      await saveDailyQuestions(paperId, merged)
+      setPaper((pp) => ({ ...pp, totalQuestions: merged.length }))
+      setGenMsg(`Added ${created.length} question(s). Paper now has ${merged.length}.`)
+    } catch (e) {
+      setError(e.message || 'Could not generate missing questions.')
+      setGenMsg('')
+    } finally {
+      setGenBusy(false)
+    }
   }
   async function onDelete() {
     if (!window.confirm('Delete this paper permanently?')) return
@@ -64,8 +106,15 @@ export default function PaperView({ kind = 'py' }) {
   }
 
   if (loading) return <Splash label="Downloading paper…" />
-  if (error) return <div className="page"><div className="auth-alert">{error}</div></div>
+  if (error && !paper) return <div className="page"><div className="auth-alert">{error}</div></div>
   if (!paper) return <div className="page"><p className="muted center mt-6">Paper not found.</p></div>
+
+  // Which question numbers are missing (a daily paper that generated short)?
+  const expected = isDaily ? (paper.stats?.expected || 150) : 0
+  const presentNums = new Set(questions.map((q) => q.questionNumber))
+  const missingNums = expected
+    ? Array.from({ length: expected }, (_, i) => i + 1).filter((n) => !presentNums.has(n))
+    : []
 
   return (
     <div className="page">
@@ -104,18 +153,41 @@ export default function PaperView({ kind = 'py' }) {
       {isAdmin && (
         <div className="card mb-4 stack gap-3">
           <div className="row gap-2" style={{ justifyContent: 'space-between' }}>
-            <span className="badge badge-admin"><Icon name="shield" size={12} /> Admin</span>
+            <span className="badge badge-admin"><Icon name="shield" size={12} /> Admin · {questions.length} questions</span>
             <div className="row gap-2">
-              {!isDaily && (editing ? (
+              {editing ? (
                 <button className="btn btn-primary" style={{ minHeight: 40 }} onClick={onSave} disabled={saving}>
                   {saving ? <span className="spinner" /> : 'Save changes'}
                 </button>
               ) : (
                 <button className="btn btn-ghost" style={{ minHeight: 40 }} onClick={() => setEditing(true)}>Edit answers</button>
-              ))}
+              )}
               <button className="btn btn-ghost" style={{ minHeight: 40, color: 'var(--red-500)' }} onClick={onDelete}>Delete</button>
             </div>
           </div>
+
+          {error && <div className="auth-alert" style={{ margin: 0 }}>{error}</div>}
+
+          {/* Missing questions (paper generated short) */}
+          {isDaily && missingNums.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-3)' }}>
+              <div style={{ fontWeight: 700, color: 'var(--gold-600)' }}>
+                ⚠ {missingNums.length} missing question(s) — expected {expected}, have {questions.length}
+              </div>
+              <div className="muted" style={{ fontSize: 'var(--fs-sm)', margin: '6px 0' }}>Missing numbers:</div>
+              <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
+                {missingNums.map((n) => <span key={n} className="q-chip" style={{ borderColor: 'var(--gold-500)', color: 'var(--gold-600)' }}>Q{n}</span>)}
+              </div>
+              <button className="btn btn-gold btn-block mt-3" onClick={() => generateMissing(missingNums)} disabled={genBusy}>
+                {genBusy ? <span className="spinner" /> : <><Icon name="sparkles" size={16} /> Generate {missingNums.length} missing with AI</>}
+              </button>
+              {genMsg && <p className="muted center mt-2" style={{ fontSize: 'var(--fs-sm)' }}>{genMsg}</p>}
+            </div>
+          )}
+          {isDaily && missingNums.length === 0 && genMsg && (
+            <p className="center" style={{ fontSize: 'var(--fs-sm)', color: 'var(--green-500)', fontWeight: 700 }}>✓ {genMsg}</p>
+          )}
+
           {isDaily && (
             <div className="row gap-3" style={{ justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-3)' }}>
               <div>
