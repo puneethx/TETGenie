@@ -7,8 +7,10 @@ import { useAuth } from '../../context/AuthContext'
 import { Splash } from '../../components/guards'
 import Icon from '../../components/Icon'
 import QuestionView from '../../components/QuestionView'
+import QuestionPager from '../../components/QuestionPager'
 import LanguageToggle from '../../components/LanguageToggle'
 import ResultShareCard from '../../components/ResultShareCard'
+import { renderNodeToFile, shareFile } from '../../lib/share'
 import './papers.css'
 
 function fmt(sec) {
@@ -42,6 +44,9 @@ export default function Exam({ kind = 'py' }) {
   const [posted, setPosted] = useState(false)
   const [postBusy, setPostBusy] = useState(false)
   const cardRef = useRef(null)
+  const shareFileRef = useRef(null)   // pre-rendered PNG, ready for instant share
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareMsg, setShareMsg] = useState('')
 
   useEffect(() => {
     Promise.all([getContentPaper(kind, paperId), getContentQuestions(kind, paperId)])
@@ -54,6 +59,18 @@ export default function Exam({ kind = 'py' }) {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTs) / 1000)), 1000)
     return () => clearInterval(t)
   }, [phase, startTs])
+
+  // On the result screen, render the share image ahead of time so tapping
+  // "Share" opens the native sheet instantly (mobile blocks slow share calls).
+  useEffect(() => {
+    if (phase !== 'result') return
+    let alive = true
+    const t = setTimeout(async () => {
+      const file = await renderNodeToFile(cardRef.current, 'tetgenie-score.png')
+      if (alive) shareFileRef.current = file
+    }, 350)
+    return () => { alive = false; clearTimeout(t) }
+  }, [phase, topPct])
 
   const q = questions[idx]
   const answeredCount = Object.keys(answers).length
@@ -104,24 +121,17 @@ export default function Exam({ kind = 'py' }) {
   }
 
   async function shareImage() {
-    if (!cardRef.current) return
+    setShareBusy(true); setShareMsg('')
     try {
-      // Lazy-load the heavy html2canvas only when the user shares.
-      const html2canvas = (await import('html2canvas')).default
-      const canvas = await html2canvas(cardRef.current, { backgroundColor: null, scale: 2, logging: false })
-      canvas.toBlob(async (blob) => {
-        if (!blob) return
-        const file = new File([blob], 'tetgenie-score.png', { type: 'image/png' })
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try { await navigator.share({ files: [file], text: 'My TETGenie score 🧞' }) } catch { /* cancelled */ }
-        } else {
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url; a.download = 'tetgenie-score.png'; a.click()
-          URL.revokeObjectURL(url)
-        }
-      }, 'image/png')
-    } catch { /* capture failed */ }
+      // Use the pre-rendered image if ready; otherwise render on demand.
+      let file = shareFileRef.current
+      if (!file) file = await renderNodeToFile(cardRef.current, 'tetgenie-score.png')
+      const outcome = await shareFile(file, 'My TETGenie score 🧞 — practice AP TET daily mock papers! tetgenie')
+      if (outcome === 'downloaded') setShareMsg('Image saved — open WhatsApp and attach it. 📎')
+      else if (outcome === 'failed') setShareMsg('Sharing unavailable — please screenshot this card.')
+    } finally {
+      setShareBusy(false)
+    }
   }
 
   if (loading) return <Splash label="Loading exam…" />
@@ -160,7 +170,10 @@ export default function Exam({ kind = 'py' }) {
         </div>
 
         <div className="stack gap-3 mb-4">
-          <button className="btn btn-gold btn-block" onClick={shareImage}><Icon name="share" size={18} /> Share result image</button>
+          <button className="btn btn-gold btn-block" onClick={shareImage} disabled={shareBusy}>
+            {shareBusy ? <span className="spinner" /> : <><Icon name="share" size={18} /> Share result image</>}
+          </button>
+          {shareMsg && <p className="muted center" style={{ fontSize: 'var(--fs-sm)' }}>{shareMsg}</p>}
           {posted ? (
             <button className="btn btn-ghost btn-block" disabled><Icon name="check" size={18} strokeWidth={3} /> Posted to leaderboard</button>
           ) : (
@@ -181,11 +194,13 @@ export default function Exam({ kind = 'py' }) {
           <span className="label" style={{ margin: 0 }}>Review answers</span>
           <LanguageToggle value={lang} onChange={setLang} />
         </div>
-        <div className="stack gap-4">
-          {questions.map((qq, i) => (
+        <QuestionPager
+          items={questions}
+          pageSize={20}
+          renderItem={(qq, i) => (
             <QuestionView key={qq.id || i} q={qq} lang={lang} showAnswer selected={answers[qq.id] ?? null} />
-          ))}
-        </div>
+          )}
+        />
       </div>
     )
   }
