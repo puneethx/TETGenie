@@ -47,26 +47,6 @@ export default function Home() {
         </p>
       </section>
 
-      <section className="offer" aria-label="Subscription offer">
-        <span className="offer-ribbon">🎉 This month only</span>
-        <div className="price-row">
-          <span className="price-old">₹300</span>
-          <span className="price"><small>₹</small>149</span>
-          <span style={{ opacity: 0.9 }}>for 30 days</span>
-        </div>
-        <span className="per-day">30 papers · just ₹5 / day</span>
-        <ul>
-          <li><span className="tick"><Icon name="check" size={12} /></span> A new 150-question paper every day for 30 days</li>
-          <li><span className="tick"><Icon name="check" size={12} /></span> Attempt with answers, or exam-mode without</li>
-          <li><span className="tick"><Icon name="check" size={12} /></span> Instant score, rank &amp; a shareable result card</li>
-          <li><span className="tick"><Icon name="check" size={12} /></span> Retake any paper to beat your best score</li>
-        </ul>
-      </section>
-
-      <p className="center muted" style={{ fontSize: 'var(--fs-sm)', marginTop: 'calc(-1 * var(--sp-2))' }}>
-        Previous-year question papers are <strong style={{ color: 'var(--green-500)' }}>free for everyone</strong> — start practising today.
-      </p>
-
       {/* Telugu introduction — most of our users are Telugu speakers */}
       <section className="intro-te card">
         <h4>TETGenie అంటే ఏమిటి? 🧞</h4>
