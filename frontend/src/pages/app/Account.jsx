@@ -33,10 +33,19 @@ export default function Account() {
       {/* Premium upsell (free users only) */}
       {!isPremium && (
         <div className="offer" style={{ margin: '0 0 var(--sp-5)' }}>
-          <div style={{ fontWeight: 800, fontSize: 'var(--fs-xl)' }}>Go Premium — ₹149 / 30 days</div>
-          <p style={{ opacity: 0.92, fontSize: 'var(--fs-sm)', marginTop: 4 }}>
-            Unlock a fresh 150-question mock paper every day. Just ₹5/day.
-          </p>
+          <span className="offer-ribbon">🎉 This month only</span>
+          <div className="price-row">
+            <span className="price-old">₹300</span>
+            <span className="price"><small>₹</small>149</span>
+            <span style={{ opacity: 0.9 }}>for 30 days</span>
+          </div>
+          <span className="per-day">30 papers · just ₹5 / day</span>
+          <ul>
+            <li><span className="tick"><Icon name="check" size={12} /></span> A new 150-question paper every day for 30 days</li>
+            <li><span className="tick"><Icon name="check" size={12} /></span> Attempt with answers, or exam-mode without</li>
+            <li><span className="tick"><Icon name="check" size={12} /></span> Instant score, rank &amp; a shareable result card</li>
+            <li><span className="tick"><Icon name="check" size={12} /></span> Retake any paper to beat your best score</li>
+          </ul>
           <a
             href={WHATSAPP_URL}
             target="_blank"
