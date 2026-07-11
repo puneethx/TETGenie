@@ -34,6 +34,21 @@ export async function getDailyQuestions(id) {
   return s.exists() ? s.data().items || [] : []
 }
 
+// Question texts from the most recent `limit` daily papers, so the generator can
+// avoid repeating them. Capped at `cap` stems to keep the request small.
+export async function recentQuestionStems(limit = 6, cap = 400) {
+  const papers = (await listDailyPapers()).slice(0, limit)
+  const stems = []
+  for (const p of papers) {
+    const items = await getDailyQuestions(p.id)
+    for (const q of items) {
+      const t = (q.englishQuestion || q.teluguQuestion || '').trim()
+      if (t) stems.push(t)
+    }
+  }
+  return stems.slice(0, cap)
+}
+
 // Premium members (and admins) can read the OTP doc.
 export async function getDailyOtp(id) {
   const s = await getDoc(doc(db, 'dailyPapers', id, 'secure', 'otp'))
