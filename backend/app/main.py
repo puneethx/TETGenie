@@ -129,7 +129,8 @@ def generate_status(job_id: str, _admin: dict = Depends(require_admin)):
 @app.post("/generate/question")
 def regenerate_question(req: RegenRequest, _admin: dict = Depends(require_admin)):
     """Regenerate a single question (admin verify → 'regenerate' with difficulty)."""
-    q = generate_one(req.subject, req.topic, req.difficulty, req.avoid)
+    q = generate_one(req.subject, req.topic, req.difficulty, req.avoid,
+                     nonce=uuid.uuid4().hex[:8])
     if not q:
         raise HTTPException(502, "Could not generate a question. Please try again.")
     return {"question": q}
