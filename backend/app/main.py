@@ -26,6 +26,8 @@ from .schemas import JobStatus
 class GenerateRequest(BaseModel):
     bank: list[dict] = []       # previous-year questions supplied by the frontend
     targetBank: int = 40        # how many of the 150 to reuse from the bank
+    seed: str = ""              # per-day seed (e.g. the paper date) → different paper daily
+    avoid: list[str] = []       # question texts from recent papers, to NOT repeat
 
 
 class RegenRequest(BaseModel):
@@ -109,7 +111,9 @@ def start_generate(req: GenerateRequest, _admin: dict = Depends(require_admin)):
     with gen_lock:
         _gen_jobs[job_id] = JobStatus(jobId=job_id, status="queued", fileName="Daily paper")
     threading.Thread(
-        target=run_generation, args=(job_id, req.bank, req.targetBank), daemon=True
+        target=run_generation,
+        args=(job_id, req.bank, req.targetBank, req.seed, req.avoid),
+        daemon=True,
     ).start()
     return {"jobId": job_id}
 
