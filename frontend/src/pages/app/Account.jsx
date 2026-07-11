@@ -33,13 +33,14 @@ export default function Account() {
       {/* Premium upsell (free users only) */}
       {!isPremium && (
         <div className="offer" style={{ margin: '0 0 var(--sp-5)' }}>
-          <span className="offer-ribbon">🎉 This month only</span>
+          <span className="offer-ribbon">🎉 Congrats!! You are part of first 500 members</span>
           <div className="price-row">
             <span className="price-old">₹300</span>
-            <span className="price"><small>₹</small>149</span>
+            <span className="price"><small>₹</small>0</span>
             <span style={{ opacity: 0.9 }}>for 30 days</span>
           </div>
-          <span className="per-day">30 papers · just ₹5 / day</span>
+          {/* <span className="per-day">30 papers · just ₹10 / day</span> */}
+          <span className="per-day">You will be a premium member shortly!</span>
           <ul>
             <li><span className="tick"><Icon name="check" size={12} /></span> A new 150-question paper every day for 30 days</li>
             <li><span className="tick"><Icon name="check" size={12} /></span> Attempt with answers, or exam-mode without</li>
