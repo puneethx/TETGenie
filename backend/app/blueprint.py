@@ -68,25 +68,35 @@ def _expand(counts: dict) -> list:
 
 
 def build_blueprint(bank_by_subject: dict | None = None,
-                    target_bank: int = 40) -> list[dict]:
+                    target_bank: int = 40, rng=None) -> list[dict]:
     """Return 150 slot specs. `bank_by_subject` maps subject -> number of
     previous-year questions available, so bank slots are only assigned where we
-    actually have questions to reuse."""
+    actually have questions to reuse.
+
+    `rng` is an optional seeded random.Random. When given, the topic and
+    difficulty of each slot are shuffled INDEPENDENTLY within every subject, and
+    which slots are 'bank' vs 'ai' is randomised too. The subject/topic/difficulty
+    RATIOS stay exactly the same (same counts) — only the pairing changes — so a
+    different seed each day yields a genuinely different paper that still mirrors
+    the real exam's weightage."""
     bank_by_subject = bank_by_subject or {}
-    # Bank slots per subject: aim for target_bank total, spread evenly, capped by
-    # what's actually available for that subject.
     per_subject_bank_target = target_bank // len(SUBJECTS)
     slots: list[dict] = []
     for subject in SUBJECTS:
         topics = _expand(allocate(PER_SUBJECT, TOPIC_WEIGHTS[subject]))
         diffs = _expand(allocate(PER_SUBJECT, DIFFICULTY_RATIO))
         n_bank = min(per_subject_bank_target, int(bank_by_subject.get(subject, 0)))
+        sources = ["bank"] * n_bank + ["ai"] * (PER_SUBJECT - n_bank)
+        if rng is not None:
+            rng.shuffle(topics)
+            rng.shuffle(diffs)
+            rng.shuffle(sources)
         for i in range(PER_SUBJECT):
             slots.append({
                 "subject": subject,
                 "topic": topics[i],
                 "difficulty": diffs[i],
-                "source": "bank" if i < n_bank else "ai",
+                "source": sources[i],
             })
     return slots
 
