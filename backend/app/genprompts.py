@@ -46,10 +46,11 @@ def gen_user_prompt(subject: str, specs: list, examples: list,
         f"or lightly reword any of them:\n{_avoid_block(avoid)}\n\n"
         f"A few more style references:\n{_examples_block(examples)}\n\n"
         f"Now, drawing on YOUR OWN subject knowledge, create ONE brand-new question for EACH spec "
-        f"below. Do not default to the single most common textbook question for a topic — explore "
-        f"different sub-concepts, contexts, numbers, names and framings so the paper feels fresh. "
-        f"Each question must be factually correct with exactly one right option, and clearly "
-        f"different from every question listed above. Specs (with required topic & difficulty):\n"
+        f"below. Each spec has a 'focus' — build that question specifically around that sub-concept "
+        f"(do NOT default to the single most common textbook question for the topic). Vary the "
+        f"scenario, numbers, names and framing so the paper feels fresh. Each question must be "
+        f"factually correct with exactly one right option, and clearly different from every question "
+        f"listed above. Specs (each with topic, difficulty and the required focus):\n"
         f"{specs_json}\n\n"
         "For each, return an object: "
         '{"slotId": str (echo it back), "topic": str, "difficulty": str, '
@@ -67,12 +68,13 @@ REGEN_SYSTEM = GEN_SYSTEM
 
 
 def regen_user_prompt(subject: str, topic: str, difficulty: str, avoid: list,
-                      nonce: str = "") -> str:
+                      nonce: str = "", focus: str = "") -> str:
     avoid_block = "\n".join(f"- {a}" for a in avoid[:12]) or "(none)"
+    focus_line = f"Focus specifically on this sub-concept: {focus}\n" if focus else ""
     return (
         f"Create ONE original AP TET SGT Paper I question."
         + (f" (session {nonce} — must be unique to this session)" if nonce else "") + "\n"
-        f"Subject: {subject}\nTopic: {topic}\nDifficulty: {difficulty}\n\n"
+        f"Subject: {subject}\nTopic: {topic}\nDifficulty: {difficulty}\n{focus_line}\n"
         f"Draw on your own subject knowledge. It MUST be clearly different from these "
         f"existing questions (do not reword them):\n{avoid_block}\n\n"
         "Return JSON: {\"question\": {"
