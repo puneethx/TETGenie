@@ -8,6 +8,7 @@ const ACTIONS = [
   { to: '/admin/users', icon: 'users', title: 'Manage users', desc: 'View all users; mark paid users as Premium', tone: 'brand' },
   { to: '/app/papers', icon: 'book', title: 'Previous-year papers', desc: 'Browse, review & edit uploaded previous-year papers', tone: 'brand' },
   { to: '/app/daily', icon: 'calendar', title: 'Daily papers', desc: 'View posted daily papers, their OTPs & delete', tone: 'gold' },
+  { to: '/app/subjects', icon: 'book', title: 'Subject-wise questions', desc: 'Browse all previous-year questions grouped by subject', tone: 'brand' },
 ]
 
 export default function AdminDashboard() {
