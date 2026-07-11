@@ -13,6 +13,7 @@ Firestore. No Firestore access from the backend.
 """
 from __future__ import annotations
 
+import os
 import re
 import json
 import random
@@ -21,7 +22,7 @@ import concurrent.futures as cf
 
 from .config import settings
 from .sap import sap
-from . import blueprint, genprompts
+from . import blueprint, genprompts, subtopics
 from .schemas import JobStatus, Question, Option
 
 _gen_jobs: dict[str, JobStatus] = {}
@@ -98,10 +99,14 @@ def _to_question(raw: dict, qnum: int, subject: str, topic: str, difficulty: str
 
 
 def generate_one(subject: str, topic: str, difficulty: str, avoid: list[str],
-                 nonce: str = "") -> dict:
+                 nonce: str = "", focus: str = "") -> dict:
+    # If no focus was supplied, pick a random sub-concept so single regenerations
+    # also vary instead of returning the topic's canonical question.
+    focus = focus or subtopics.pick(None, subject, topic)
     raw = sap.chat(
         genprompts.REGEN_SYSTEM,
-        genprompts.regen_user_prompt(subject, topic, difficulty, avoid, nonce=nonce),
+        genprompts.regen_user_prompt(subject, topic, difficulty, avoid,
+                                     nonce=nonce, focus=focus),
         max_tokens=1200,
         temperature=0.9,
     )
@@ -121,11 +126,12 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
     with _lock:
         _gen_jobs[job_id] = job
     try:
-        # A seeded RNG makes the WHOLE paper vary day to day: which previous-year
-        # questions are reused, which topic/difficulty lands in which slot, and the
-        # order of examples fed to the model. Same seed → reproducible; a new seed
-        # each day (the paper date) → a genuinely different paper.
-        rng = random.Random(seed or job_id)
+        # Mix fresh server-side entropy into the seed so EVERY generation is unique
+        # — different reused questions, slot arrangement, sub-concept focuses and
+        # prompt nonce — even if two requests carry the same date (or the frontend
+        # sends a plain date). This is the guarantee that no two papers are alike.
+        run_seed = f"{seed or 'gen'}-{os.urandom(6).hex()}"
+        rng = random.Random(run_seed)
         # Questions used in recent papers — never repeat these (plus we grow this
         # list with each question we place, so the paper has no internal repeats).
         avoid_stems: list[str] = list(avoid or [])
@@ -148,6 +154,10 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
         for i, s in enumerate(slots):
             s["qnum"] = i + 1
             s["slotId"] = f"slot-{i + 1}"
+            # A random sub-concept per slot — this is what forces genuinely
+            # different questions each run instead of the one canonical question
+            # the model defaults to for a topic.
+            s["focus"] = subtopics.pick(rng, s["subject"], s["topic"])
         _set(job, totalPages=len(slots),
              message="Planning paper (topics & difficulty)…")
 
@@ -215,12 +225,13 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
         done_specs = 0
 
         def do_batch(subj, sslots):
-            specs = [{"slotId": s["slotId"], "topic": s["topic"], "difficulty": s["difficulty"]}
+            specs = [{"slotId": s["slotId"], "topic": s["topic"],
+                      "difficulty": s["difficulty"], "focus": s.get("focus", s["topic"])}
                      for s in sslots]
             raw = sap.chat(
                 genprompts.GEN_SYSTEM,
                 genprompts.gen_user_prompt(subj, specs, examples.get(subj, [])[:6],
-                                           avoid=avoid_prompt.get(subj, []), seed=seed),
+                                           avoid=avoid_prompt.get(subj, []), seed=run_seed),
                 max_tokens=4000,
                 temperature=0.9,
             )
@@ -256,7 +267,8 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
             try:
                 g = generate_one(slot["subject"], slot["topic"], slot["difficulty"],
                                  avoid_prompt.get(slot["subject"], []),
-                                 nonce=f"{seed}-{slot['qnum']}")
+                                 nonce=f"{run_seed}-{slot['qnum']}",
+                                 focus=slot.get("focus", ""))
                 return slot, (g or None)
             except Exception:
                 return slot, None
@@ -301,7 +313,8 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
                     try:
                         avoid = sorted(seen_stems, key=lambda o: _similarity(text, o), reverse=True)[:6]
                         newq = generate_one(q.subject, q.topic, q.difficulty, avoid,
-                                            nonce=f"{seed}-dup{q.questionNumber}-{_try}")
+                                            nonce=f"{run_seed}-dup{q.questionNumber}-{_try}",
+                                            focus=subtopics.pick(rng, q.subject, q.topic))
                         if newq and _max_sim(_stem(newq), seen_stems) <= DUP_THRESHOLD:
                             q.englishQuestion = newq.get("englishQuestion", q.englishQuestion)
                             q.teluguQuestion = newq.get("teluguQuestion", q.teluguQuestion)
