@@ -69,14 +69,15 @@ REGEN_SYSTEM = GEN_SYSTEM
 
 def regen_user_prompt(subject: str, topic: str, difficulty: str, avoid: list,
                       nonce: str = "", focus: str = "") -> str:
-    avoid_block = "\n".join(f"- {a}" for a in avoid[:12]) or "(none)"
+    avoid_block = "\n".join(f"- {a}" for a in avoid[:20]) or "(none)"
     focus_line = f"Focus specifically on this sub-concept: {focus}\n" if focus else ""
     return (
         f"Create ONE original AP TET SGT Paper I question."
         + (f" (session {nonce} — must be unique to this session)" if nonce else "") + "\n"
         f"Subject: {subject}\nTopic: {topic}\nDifficulty: {difficulty}\n{focus_line}\n"
-        f"Draw on your own subject knowledge. It MUST be clearly different from these "
-        f"existing questions (do not reword them):\n{avoid_block}\n\n"
+        f"The questions listed below are ALREADY in the paper. You MUST ask about a "
+        f"COMPLETELY DIFFERENT sub-concept/aspect — identify what concept each covers "
+        f"and deliberately choose something else. Do NOT rephrase the same idea:\n{avoid_block}\n\n"
         "Return JSON: {\"question\": {"
         '"englishQuestion": str, "teluguQuestion": str (\"\" if English-only), '
         '"options": [{"index":1-4,"english":str,"telugu":str}], '
