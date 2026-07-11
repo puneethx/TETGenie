@@ -104,7 +104,7 @@ export default function Generate() {
     setRegenBusy(i)
     setRegenIdx(null)
     try {
-      const avoid = questions.filter((_, k) => k !== i).map((x) => x.englishQuestion).filter(Boolean).slice(0, 8)
+      const avoid = questions.filter((_, k) => k !== i).map((x) => x.englishQuestion).filter(Boolean).slice(0, 30)
       const nq = await regenerateQuestion({ subject: q.subject, topic: q.topic, difficulty, avoid })
       setQuestions((qs) => qs.map((x, k) => (k === i ? {
         ...x,
