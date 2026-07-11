@@ -16,13 +16,19 @@ export function Splash({ label = 'Loading…' }) {
   )
 }
 
+// Pages we never want to restore after re-login — user should land on home instead.
+const NO_RESTORE = ['/app/account']
+
 // Requires a signed-in user; otherwise sends to /login and remembers where
 // the user was heading so we can return them there after login.
 export function RequireAuth() {
   const { isAuthenticated, loading } = useAuth()
   const location = useLocation()
   if (loading) return <Splash />
-  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />
+  if (!isAuthenticated) {
+    const from = NO_RESTORE.includes(location.pathname) ? undefined : location
+    return <Navigate to="/login" state={{ from }} replace />
+  }
   return <Outlet />
 }
 
