@@ -21,15 +21,32 @@ def _examples_block(examples: list) -> str:
     return "\n".join(lines)
 
 
-def gen_user_prompt(subject: str, specs: list, examples: list) -> str:
-    """specs: list of {slotId, topic, difficulty}. Generate one question each."""
+def _avoid_block(avoid: list) -> str:
+    if not avoid:
+        return "(none)"
+    return "\n".join(f"- {a}" for a in avoid[:40])
+
+
+def gen_user_prompt(subject: str, specs: list, examples: list,
+                    avoid: list | None = None, seed: str = "") -> str:
+    """specs: list of {slotId, topic, difficulty}. Generate one question each.
+
+    `avoid` is questions used in PREVIOUS papers (and elsewhere in this paper) —
+    the model must not repeat them. `seed` is a per-day tag included so that an
+    identical request is never sent twice (prevents any response caching from
+    handing back yesterday's questions)."""
     specs_json = json.dumps(specs, ensure_ascii=False)
+    avoid = avoid or []
     return (
+        f"Paper session: {seed or 'adhoc'} (generate content unique to this session).\n"
         f"Subject: {subject}\n"
         f"Previous-year example questions from this subject (match this style & level):\n"
         f"{_examples_block(examples)}\n\n"
-        f"Create ONE original question for EACH spec below. Do NOT copy the examples; make them "
-        f"different. Specs (with required topic & difficulty):\n{specs_json}\n\n"
+        f"Do NOT reuse or lightly reword any of these already-used questions "
+        f"(from earlier papers and this paper):\n{_avoid_block(avoid)}\n\n"
+        f"Create ONE original question for EACH spec below. Every question must be NEW and "
+        f"clearly different from the examples and from the already-used list above — change the "
+        f"scenario, numbers, names and framing. Specs (with required topic & difficulty):\n{specs_json}\n\n"
         "For each, return an object: "
         '{"slotId": str (echo it back), "topic": str, "difficulty": str, '
         '"englishQuestion": str, "teluguQuestion": str (\"\" for English-only items), '
