@@ -55,12 +55,14 @@ export async function waitForExtraction(jobId, onProgress, intervalMs = 2500) {
 }
 
 // ── Daily-paper generation ──
-export async function startGeneration(bank, targetBank = 40) {
+// `seed` (e.g. the paper date) makes each day's paper different; `avoid` is a
+// list of question texts from recent papers that must not be repeated.
+export async function startGeneration(bank, targetBank = 40, { seed = '', avoid = [] } = {}) {
   if (!BASE) throw new Error('AI backend URL is not configured (VITE_AI_BACKEND_URL).')
   const res = await fetch(`${BASE}/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ bank, targetBank }),
+    body: JSON.stringify({ bank, targetBank, seed, avoid }),
   })
   if (!res.ok) throw new Error(await parseError(res))
   return res.json()
