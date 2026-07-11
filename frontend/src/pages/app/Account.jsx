@@ -33,7 +33,7 @@ export default function Account() {
       {/* Premium upsell (free users only) */}
       {!isPremium && (
         <div className="offer" style={{ margin: '0 0 var(--sp-5)' }}>
-          <span className="offer-ribbon">🎉 Congrats!! You are part of first 500 members</span>
+          <span className="offer-ribbon">🎉 This week only</span>
           <div className="price-row">
             <span className="price-old">₹300</span>
             <span className="price"><small>₹</small>0</span>
