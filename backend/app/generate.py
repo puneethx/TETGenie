@@ -273,7 +273,7 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
             except Exception:
                 return slot, None
 
-        for round_no in range(4):  # up to 4 passes chasing the last few
+        for round_no in range(8):  # up to 8 passes chasing the last few
             missing = [s for s in slots if s["qnum"] not in questions]
             if not missing:
                 break
