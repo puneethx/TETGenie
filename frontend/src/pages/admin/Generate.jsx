@@ -79,11 +79,14 @@ export default function Generate() {
     setPhase('processing')
     setJob({ status: 'queued', pagesDone: 0, totalPages: 0, questionsFound: 0 })
     try {
-      const bank = await loadBank()
+      const bank = await loadBank()          // all previous-year papers (up to 12)
       setBankCount(bank.length)
-      // Seed by date so every day differs; avoid repeating recent papers' questions.
+      // A UNIQUE seed per request (date + random token) guarantees a different
+      // paper every time — even two generations for the same date. `avoid` lists
+      // recent daily-paper questions so we never repeat them either.
+      const nonce = (crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`)
       const avoid = await recentQuestionStems().catch(() => [])
-      const { jobId } = await startGeneration(bank, Number(targetBank), { seed: date, avoid })
+      const { jobId } = await startGeneration(bank, Number(targetBank), { seed: `${date}-${nonce}`, avoid })
       const final = await waitForGeneration(jobId, setJob)
       if (final.status === 'error') { setError(final.error || 'Generation failed.'); setPhase('error'); return }
       setQuestions(final.questions || [])
