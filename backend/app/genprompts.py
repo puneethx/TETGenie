@@ -24,7 +24,7 @@ def _examples_block(examples: list) -> str:
 def _avoid_block(avoid: list) -> str:
     if not avoid:
         return "(none)"
-    return "\n".join(f"- {a}" for a in avoid[:40])
+    return "\n".join(f"- {a}" for a in avoid[:45])
 
 
 def gen_user_prompt(subject: str, specs: list, examples: list,
@@ -38,15 +38,19 @@ def gen_user_prompt(subject: str, specs: list, examples: list,
     specs_json = json.dumps(specs, ensure_ascii=False)
     avoid = avoid or []
     return (
-        f"Paper session: {seed or 'adhoc'} (generate content unique to this session).\n"
+        f"Paper session: {seed or 'adhoc'} — this is a NEW paper; its questions must not match "
+        f"any other session's.\n"
         f"Subject: {subject}\n"
-        f"Previous-year example questions from this subject (match this style & level):\n"
-        f"{_examples_block(examples)}\n\n"
-        f"Do NOT reuse or lightly reword any of these already-used questions "
-        f"(from earlier papers and this paper):\n{_avoid_block(avoid)}\n\n"
-        f"Create ONE original question for EACH spec below. Every question must be NEW and "
-        f"clearly different from the examples and from the already-used list above — change the "
-        f"scenario, numbers, names and framing. Specs (with required topic & difficulty):\n{specs_json}\n\n"
+        f"Below are previous-year questions from this subject. Use them ONLY to gauge the style, "
+        f"difficulty and topic coverage — they have ALREADY been asked, so you must NOT reproduce "
+        f"or lightly reword any of them:\n{_avoid_block(avoid)}\n\n"
+        f"A few more style references:\n{_examples_block(examples)}\n\n"
+        f"Now, drawing on YOUR OWN subject knowledge, create ONE brand-new question for EACH spec "
+        f"below. Do not default to the single most common textbook question for a topic — explore "
+        f"different sub-concepts, contexts, numbers, names and framings so the paper feels fresh. "
+        f"Each question must be factually correct with exactly one right option, and clearly "
+        f"different from every question listed above. Specs (with required topic & difficulty):\n"
+        f"{specs_json}\n\n"
         "For each, return an object: "
         '{"slotId": str (echo it back), "topic": str, "difficulty": str, '
         '"englishQuestion": str, "teluguQuestion": str (\"\" for English-only items), '
@@ -62,12 +66,15 @@ def gen_user_prompt(subject: str, specs: list, examples: list,
 REGEN_SYSTEM = GEN_SYSTEM
 
 
-def regen_user_prompt(subject: str, topic: str, difficulty: str, avoid: list) -> str:
-    avoid_block = "\n".join(f"- {a}" for a in avoid[:8]) or "(none)"
+def regen_user_prompt(subject: str, topic: str, difficulty: str, avoid: list,
+                      nonce: str = "") -> str:
+    avoid_block = "\n".join(f"- {a}" for a in avoid[:12]) or "(none)"
     return (
-        f"Create ONE original AP TET SGT Paper I question.\n"
+        f"Create ONE original AP TET SGT Paper I question."
+        + (f" (session {nonce} — must be unique to this session)" if nonce else "") + "\n"
         f"Subject: {subject}\nTopic: {topic}\nDifficulty: {difficulty}\n\n"
-        f"It MUST be clearly different from these existing questions:\n{avoid_block}\n\n"
+        f"Draw on your own subject knowledge. It MUST be clearly different from these "
+        f"existing questions (do not reword them):\n{avoid_block}\n\n"
         "Return JSON: {\"question\": {"
         '"englishQuestion": str, "teluguQuestion": str (\"\" if English-only), '
         '"options": [{"index":1-4,"english":str,"telugu":str}], '
