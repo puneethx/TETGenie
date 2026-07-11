@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 import json
+import random
 import threading
 import concurrent.futures as cf
 
@@ -96,12 +97,13 @@ def _to_question(raw: dict, qnum: int, subject: str, topic: str, difficulty: str
     )
 
 
-def generate_one(subject: str, topic: str, difficulty: str, avoid: list[str]) -> dict:
+def generate_one(subject: str, topic: str, difficulty: str, avoid: list[str],
+                 nonce: str = "") -> dict:
     raw = sap.chat(
         genprompts.REGEN_SYSTEM,
-        genprompts.regen_user_prompt(subject, topic, difficulty, avoid),
+        genprompts.regen_user_prompt(subject, topic, difficulty, avoid, nonce=nonce),
         max_tokens=1200,
-        temperature=0.7,
+        temperature=0.9,
     )
     return _parse(raw).get("question", {})
 
@@ -113,17 +115,36 @@ def _examples_by_subject(bank: list[dict]) -> dict:
     return out
 
 
-def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None:
+def run_generation(job_id: str, bank: list[dict], target_bank: int = 40,
+                   seed: str = "", avoid: list[str] | None = None) -> None:
     job = JobStatus(jobId=job_id, status="generating", fileName="Daily paper")
     with _lock:
         _gen_jobs[job_id] = job
     try:
+        # A seeded RNG makes the WHOLE paper vary day to day: which previous-year
+        # questions are reused, which topic/difficulty lands in which slot, and the
+        # order of examples fed to the model. Same seed → reproducible; a new seed
+        # each day (the paper date) → a genuinely different paper.
+        rng = random.Random(seed or job_id)
+        # Questions used in recent papers — never repeat these (plus we grow this
+        # list with each question we place, so the paper has no internal repeats).
+        avoid_stems: list[str] = list(avoid or [])
+        # EVERY previous-year question, grouped by subject. These are fed to the
+        # model as "already asked — invent something new on the same topic", which
+        # is what actually breaks the model's habit of returning the one canonical
+        # question per topic every time.
+        py_by_subject: dict[str, list[str]] = {}
+        for q in bank:
+            st = _stem(q)
+            if st:
+                py_by_subject.setdefault(q.get("subject", ""), []).append(st)
+
         # ── 1. blueprint ──
         bank_by_subject: dict = {}
         for q in bank:
             s = q.get("subject", "")
             bank_by_subject[s] = bank_by_subject.get(s, 0) + 1
-        slots = blueprint.build_blueprint(bank_by_subject, target_bank=target_bank)
+        slots = blueprint.build_blueprint(bank_by_subject, target_bank=target_bank, rng=rng)
         for i, s in enumerate(slots):
             s["qnum"] = i + 1
             s["slotId"] = f"slot-{i + 1}"
@@ -131,24 +152,38 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
              message="Planning paper (topics & difficulty)…")
 
         examples = _examples_by_subject(bank)
+        # Shuffle the examples fed to the model so it isn't anchored on the same
+        # few questions every day (and pick a varied handful each run).
+        for subj in examples:
+            rng.shuffle(examples[subj])
         questions: dict[int, Question] = {}
 
-        # ── 2. fill bank slots ──
+        # ── 2. fill bank slots (rotated by seed → different reuse each day) ──
         used_bank_ids = set()
+
+        def _fresh(q) -> bool:
+            return _stem(q) not in avoid_stems  # not used in a recent paper
+
         for slot in slots:
             if slot["source"] != "bank":
                 continue
             subj = slot["subject"]
             pool = [q for q in bank
                     if q.get("subject") == subj and id(q) not in used_bank_ids]
-            # prefer a topic match
-            pick = next((q for q in pool if q.get("topic") == slot["topic"]), None) \
+            rng.shuffle(pool)  # rotate which previous-year question we reuse
+            pick = (
+                next((q for q in pool if q.get("topic") == slot["topic"] and _fresh(q)), None)
+                or next((q for q in pool if _fresh(q)), None)
+                or next((q for q in pool if q.get("topic") == slot["topic"]), None)
                 or (pool[0] if pool else None)
+            )
             if pick:
                 used_bank_ids.add(id(pick))
-                questions[slot["qnum"]] = _to_question(
+                q = _to_question(
                     pick, slot["qnum"], subj, pick.get("topic") or slot["topic"],
                     pick.get("difficulty") or slot["difficulty"], "bank")
+                questions[slot["qnum"]] = q
+                avoid_stems.append(_stem(q))
             else:
                 slot["source"] = "ai"  # nothing to reuse → generate instead
 
@@ -162,6 +197,19 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
             for i in range(0, len(sslots), BATCH_SPECS):
                 batches.append((subj, sslots[i:i + BATCH_SPECS]))
 
+        # A per-subject "do NOT reproduce these" list for the prompt: a RANDOM,
+        # rotated sample of that subject's previous-year questions plus recent
+        # daily questions. Rotating it every run makes the prompt itself different
+        # each generation, so the model's output changes even for the same date
+        # and even if the endpoint ignores temperature.
+        avoid_prompt: dict[str, list[str]] = {}
+        for subj in set(list(py_by_subject) + [s["subject"] for s in slots]):
+            sample = list(py_by_subject.get(subj, []))
+            rng.shuffle(sample)
+            recent = list(avoid or [])
+            rng.shuffle(recent)
+            avoid_prompt[subj] = (recent[:12] + sample)[:45]
+
         _set(job, status="generating",
              message=f"Writing {len(ai_slots)} fresh questions with Claude…")
         done_specs = 0
@@ -171,9 +219,10 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
                      for s in sslots]
             raw = sap.chat(
                 genprompts.GEN_SYSTEM,
-                genprompts.gen_user_prompt(subj, specs, examples.get(subj, [])),
+                genprompts.gen_user_prompt(subj, specs, examples.get(subj, [])[:6],
+                                           avoid=avoid_prompt.get(subj, []), seed=seed),
                 max_tokens=4000,
-                temperature=0.7,
+                temperature=0.9,
             )
             try:
                 gen = _parse(raw).get("questions", [])
@@ -205,7 +254,9 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
         # topics/difficulties that are still empty.
         def fill_one(slot):
             try:
-                g = generate_one(slot["subject"], slot["topic"], slot["difficulty"], [])
+                g = generate_one(slot["subject"], slot["topic"], slot["difficulty"],
+                                 avoid_prompt.get(slot["subject"], []),
+                                 nonce=f"{seed}-{slot['qnum']}")
                 return slot, (g or None)
             except Exception:
                 return slot, None
@@ -226,20 +277,31 @@ def run_generation(job_id: str, bank: list[dict], target_bank: int = 40) -> None
                     _set(job, questionsFound=len(questions))
 
         # ── 4. de-duplicate generated questions ──
+        # Seed the "seen" list with questions from recent papers so today's fresh
+        # questions can't collide with earlier days either. Bank (reused
+        # previous-year) questions are intentionally kept as-is.
         _set(job, status="enriching", message="Checking for duplicates…")
         ordered = [questions[n] for n in sorted(questions)]
-        seen_stems: list[str] = []
+        bank_qnums = {s["qnum"] for s in slots if s["source"] == "bank"}
+        # Seed with recent-daily questions AND every previous-year question, so a
+        # generated question that merely echoes a previous-year one is caught and
+        # regenerated — the AI questions must be genuinely new.
+        seen_stems: list[str] = list(avoid or [])
+        for stems in py_by_subject.values():
+            seen_stems.extend(stems)
         dup_count = 0
         for q in ordered:
             if q.correctOption is None:
                 continue
             text = _stem(q)
-            if _max_sim(text, seen_stems) > DUP_THRESHOLD and q.id.startswith("q"):
+            if (q.questionNumber not in bank_qnums
+                    and _max_sim(text, seen_stems) > DUP_THRESHOLD and q.id.startswith("q")):
                 # regenerate up to twice, avoiding the closest matches
-                for _ in range(2):
+                for _try in range(2):
                     try:
                         avoid = sorted(seen_stems, key=lambda o: _similarity(text, o), reverse=True)[:6]
-                        newq = generate_one(q.subject, q.topic, q.difficulty, avoid)
+                        newq = generate_one(q.subject, q.topic, q.difficulty, avoid,
+                                            nonce=f"{seed}-dup{q.questionNumber}-{_try}")
                         if newq and _max_sim(_stem(newq), seen_stems) <= DUP_THRESHOLD:
                             q.englishQuestion = newq.get("englishQuestion", q.englishQuestion)
                             q.teluguQuestion = newq.get("teluguQuestion", q.teluguQuestion)
