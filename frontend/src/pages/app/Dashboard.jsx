@@ -39,7 +39,7 @@ export default function Dashboard() {
             {isPremium ? '⭐ Premium member' : 'Free plan'}
           </div>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.85 }}>
-            {isPremium ? 'Daily papers unlocked' : 'Upgrade for daily mock papers'}
+            {isPremium ? 'Daily papers unlocked, ask for OTPs' : 'Upgrade for daily mock papers'}
           </div>
         </div>
         {!isPremium && (
