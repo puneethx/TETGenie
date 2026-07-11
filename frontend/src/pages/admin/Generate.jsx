@@ -4,7 +4,7 @@ import {
   startGeneration, waitForGeneration, regenerateQuestion, isBackendConfigured,
 } from '../../lib/api'
 import { loadBank } from '../../lib/papers'
-import { publishDailyPaper, makeOtp } from '../../lib/daily'
+import { publishDailyPaper, makeOtp, recentQuestionStems } from '../../lib/daily'
 import { renderNodeToFile, shareFile } from '../../lib/share'
 import Icon from '../../components/Icon'
 import PageHeader from '../../components/PageHeader'
@@ -81,7 +81,9 @@ export default function Generate() {
     try {
       const bank = await loadBank()
       setBankCount(bank.length)
-      const { jobId } = await startGeneration(bank, Number(targetBank))
+      // Seed by date so every day differs; avoid repeating recent papers' questions.
+      const avoid = await recentQuestionStems().catch(() => [])
+      const { jobId } = await startGeneration(bank, Number(targetBank), { seed: date, avoid })
       const final = await waitForGeneration(jobId, setJob)
       if (final.status === 'error') { setError(final.error || 'Generation failed.'); setPhase('error'); return }
       setQuestions(final.questions || [])
