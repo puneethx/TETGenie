@@ -20,6 +20,7 @@ const ADMIN_NAV = [
   { to: '/admin/upload', icon: 'upload', label: 'Upload' },
   { to: '/admin/generate', icon: 'sparkles', label: 'Generate' },
   { to: '/admin/users', icon: 'users', label: 'Users' },
+  { to: '/app/subjects', icon: 'book', label: 'Subjects' },
   { to: '/app/account', icon: 'user', label: 'Me' },
 ]
 
